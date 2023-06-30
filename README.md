@@ -46,12 +46,13 @@ struct ContentView: View {
 
 To see SwiftUIComponents in action and explore different use cases, check out the examples provided in the `Examples/ViewExamples` directory of this repository. Each example demonstrates how to use specific components and showcases their capabilities.
 
-## Preview
+## [Preview](Resources/preview.mov)
 
-<video width="296" height="640" controls>
+<video width="360" height="640" controls>
   <source src="Resources/preview.mov" type="video/mp4">
   Your browser does not support the video tag.
 </video>
+
 
 ## Documentation
 
