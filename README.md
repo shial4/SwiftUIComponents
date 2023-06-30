@@ -48,7 +48,7 @@ To see SwiftUIComponents in action and explore different use cases, check out th
 
 ## Preview
 
-<video width="640" height="360" controls>
+<video width="296" height="640" controls>
   <source src="Resources/preview.mov" type="video/mp4">
   Your browser does not support the video tag.
 </video>
