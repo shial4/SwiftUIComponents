@@ -1,9 +1,27 @@
+# Xcode
 .DS_Store
+build/
+DerivedData/
 /.build
 /Packages
 /*.xcodeproj
 xcuserdata/
-DerivedData/
 .swiftpm/config/registries.json
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc
+*.pbxuser
+!default.pbxuser
+*.xcworkspace
+!*.xcworkspace
+*.xcworkspacedata
+!*.xcworkspacedata
+*.xcproj
+!*.xcproj
+*.swiftpm
+*.playground
+
+# macOS
+.DS_Store
+
+# Swift Package Manager
+.build/
