@@ -1,6 +1,6 @@
 import SwiftUI
 
-public enum RectCorner {
+public enum RectCorner : Sendable {
     case topLeft, topRight, bottomLeft, bottomRight, allCorners
 }
 
