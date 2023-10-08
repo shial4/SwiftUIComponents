@@ -108,9 +108,9 @@ public struct DynamicList<Content: View>: View {
         let leadingPadding: Double
         switch orientation {
         case .horizontal:
-            leadingPadding = start.width - lengths[start.index]
+            leadingPadding = max(0, start.width - lengths[start.index])
         case .vertical:
-            leadingPadding = start.width - lengths[start.index]
+            leadingPadding = max(0, start.width - lengths[start.index])
         }
         
         return HStack(spacing: 0) {
@@ -140,3 +140,4 @@ public struct DynamicList<Content: View>: View {
         return view
     }
 }
+
