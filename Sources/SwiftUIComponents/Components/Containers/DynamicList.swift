@@ -1,32 +1,5 @@
-import Foundation
 import SwiftUI
-
-public enum Orientation {
-    case horizontal
-    case vertical
-}
-
-public struct StackView<Content: View>: View {
-    private var orientation: Orientation
-    private let content: Content
-    
-    init(orientation: Orientation, @ViewBuilder content: () -> Content) {
-        self.orientation = orientation
-        self.content = content()
-    }
-    
-    public var body: some View {
-        if orientation == .horizontal {
-            HStack(spacing: 0) {
-                content
-            }
-        } else {
-            VStack(spacing: 0) {
-                content
-            }
-        }
-    }
-}
+import Foundation
 
 public struct DynamicList<Content: View>: View {
     @StateObject private var viewModel = ViewModel()
@@ -135,8 +108,8 @@ public struct DynamicList<Content: View>: View {
         let x = orientation == .horizontal ? isLeading ? -length[start.index] : length[start.index] : 0
         let y = orientation == .vertical ? isLeading ? -length[start.index] : length[start.index] : 0
         return .asymmetric(
-            insertion: .offset(x: x, y: y),
-            removal: .opacity
+            insertion: AnyTransition.offset(x: x, y: y),
+            removal: AnyTransition.opacity
         )
     }
 
@@ -233,14 +206,51 @@ public struct DynamicList<Content: View>: View {
                     .transition(
                         transition(index: index, start: start, endIndex: endIndex)
                     )
-                    .background(Color.blue)
+                    .background(Color.green)
+                    .border(Color.blue)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: Double.infinity, maxHeight: Double.infinity)
         .offset(x: orientation == .horizontal ? viewModel.scrollOffset : 0,
                 y: orientation == .vertical ? viewModel.scrollOffset : 0)
         .contentShape(Rectangle())
         .gesture(dragGesture(screenDimension: screenDimension))
+        .onHover { inside in
+            if inside {
+                onHover(size)
+            } else {
+                cleanUpMonitors()
+            }
+        }
+    }
+    
+    private func cleanUpMonitors() {
+        guard let monitor = viewModel.eventsMonitor else { return }
+        viewModel.eventsMonitor = nil
+        #if canImport(AppKit)
+        NSEvent.removeMonitor(monitor)
+        #endif
+    }
+    
+    private func onHover(_ size: CGSize) {
+        guard viewModel.eventsMonitor == nil else { return }
+        #if canImport(AppKit)
+        viewModel.eventsMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { event in
+            let scrollOffset = max(min(0, viewModel.scrollOffset + event.scrollingDeltaY), size.width - length.total)
+            
+            viewModel.isLeadingAnimation = viewModel.scrollOffset < scrollOffset
+            withAnimation(animation) {
+                viewModel.scrollOffset = scrollOffset
+            }
+            
+            viewModel.previousScrollOffset = scrollOffset
+            if self.scrollOffset != scrollOffset {
+                self.scrollOffset = scrollOffset
+            }
+            
+            return event
+        }
+        #endif
     }
     
     public func orientation(_ orientation: Orientation) -> Self {
@@ -248,57 +258,91 @@ public struct DynamicList<Content: View>: View {
         view.orientation = orientation
         return view
     }
+}
+
+// MARK: Types
+
+public enum Orientation {
+    case horizontal
+    case vertical
+
+    public func not() -> Orientation {
+        return self == Orientation.horizontal ? Orientation.vertical : Orientation.horizontal
+    }
+}
+
+public struct StackView<Content: View>: View {
+    private var orientation: Orientation
+    private let content: Content
     
-    // MARK: Internal types
-    
-    private class ViewModel: ObservableObject {
-        @Published var scrollOffset: Double = 0
-        var previousScrollOffset: Double = 0
-        var isLeadingAnimation: Bool? = nil
+    public init(orientation: Orientation, @ViewBuilder content: () -> Content) {
+        self.orientation = orientation
+        self.content = content()
     }
     
-    private struct Length: Sequence, IteratorProtocol {
-        let lengths: [Double]
-        let length: Double
-        let count: Int
-        let total: Double
-        
-        private var currentIndex: Int = 0
-        
-        init(lengths: [Double]) {
-            self.lengths = lengths
-            self.length = 0
-            self.count = lengths.count
-            self.total = lengths.reduce(0.0, +)
-        }
-        
-        init(length: Double, numberOfItems: Int) {
-            self.lengths = []
-            self.length = length
-            self.count = numberOfItems
-            self.total = length * Double(numberOfItems)
-        }
-        
-        subscript(index: Int) -> Double {
-            get {
-                if !lengths.isEmpty, index >= 0 && index < lengths.count {
-                    return lengths[index]
-                }
-                return length
+    public var body: some View {
+        if orientation == .horizontal {
+            HStack(spacing: 0) {
+                content
+            }
+        } else {
+            VStack(spacing: 0) {
+                content
             }
         }
-        
-        func makeIterator() -> Self {
-            return self
-        }
-        
-        mutating func next() -> Double? {
-            guard currentIndex < count else {
-                return nil
+    }
+}
+
+// MARK: Internal types
+
+private class ViewModel: ObservableObject {
+    @Published var scrollOffset: Double = 0
+    var previousScrollOffset: Double = 0
+    var isLeadingAnimation: Bool? = nil
+    var eventsMonitor: Any? = nil
+}
+
+private struct Length: Sequence, IteratorProtocol {
+    let lengths: [Double]
+    let length: Double
+    let count: Int
+    let total: Double
+    
+    private var currentIndex: Int = 0
+    
+    init(lengths: [Double]) {
+        self.lengths = lengths
+        self.length = 0
+        self.count = lengths.count
+        self.total = lengths.reduce(0.0, +)
+    }
+    
+    init(length: Double, numberOfItems: Int) {
+        self.lengths = []
+        self.length = length
+        self.count = numberOfItems
+        self.total = length * Double(numberOfItems)
+    }
+    
+    subscript(index: Int) -> Double {
+        get {
+            if !lengths.isEmpty, (0..<lengths.count).contains(index) {
+                return lengths[index]
             }
-            
-            defer { currentIndex += 1 }
-            return self[currentIndex]
+            return length
         }
+    }
+    
+    func makeIterator() -> Self {
+        return self
+    }
+    
+    mutating func next() -> Double? {
+        guard currentIndex < count else {
+            return nil
+        }
+        
+        defer { currentIndex += 1 }
+        return self[currentIndex]
     }
 }

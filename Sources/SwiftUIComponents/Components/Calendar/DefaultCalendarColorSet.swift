@@ -15,15 +15,12 @@ public protocol CalendarColorSet {
 /// A default implementation of the `CalendarColorSet` protocol.
 public struct DefaultCalendarColorSet: CalendarColorSet {
     public init() {}
-}
-
-extension CalendarColorSet {
-    public var todayColor: Color { .blue }
-    public var sundayColor: Color { .red }
-    public var saturdayColor: Color { .gray }
-    public var weekdayColor: Color { .white }
-    public var selectionColor: Color { .green.opacity(0.4) }
-    public var otherDateColor: Color { .gray.opacity(0.6) }
-    public var weekdayHeaderColor: Color { .white }
-    public var headerButtonColors: Color { .white }
+    public var todayColor: Color { Color.blue }
+    public var sundayColor: Color { Color.red }
+    public var saturdayColor: Color { Color.red.opacity(0.6) }
+    public var weekdayColor: Color { Color.white }
+    public var selectionColor: Color { Color.green.opacity(0.4) }
+    public var otherDateColor: Color { Color.white.opacity(0.25) }
+    public var weekdayHeaderColor: Color { Color.white }
+    public var headerButtonColors: Color { Color.white }
 }

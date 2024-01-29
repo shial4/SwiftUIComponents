@@ -10,12 +10,11 @@ public enum CalendarType {
 public struct CalendarView<Day, Weekday, Header>: View where Day: View, Weekday: View, Header: View {
     @Binding var date: Date
     @Binding var selection: ClosedRange<Date>?
+    private let type: CalendarType
+    private var colorSet: CalendarColorSet
+    private var calendar: Calendar
     private var isMultiselectionEnabled: Bool = true
     private var isSelectionEnabled: Bool = true
-    private var colorSet: CalendarColorSet = DefaultCalendarColorSet()
-     
-    private var type: CalendarType
-    private var calendar: Calendar = Calendar(identifier: .gregorian)
     private var headerView: (_ date: Binding<Date>, _ calendar: Calendar) -> Header
     private var weekdaysView: (_ calendar: Calendar) -> Weekday
     private var dayView: (_ date: Date, _ calendar: Calendar, _ isDateInMonth: Bool, _ isSelected: DaySelection?) -> Day
@@ -34,6 +33,7 @@ public struct CalendarView<Day, Weekday, Header>: View where Day: View, Weekday:
                   selection: Binding<ClosedRange<Date>?>,
                   calendar: Calendar,
                   type: CalendarType = .monthly,
+                  colorSet: CalendarColorSet = DefaultCalendarColorSet(),
                   headerView: @escaping (_ date: Binding<Date>, _ calendar: Calendar) -> Header,
                   weekdaysView: @escaping (_ calendar: Calendar) -> Weekday,
                   dayView: @escaping (_ date: Date, _ calendar: Calendar, _ isDateInMonth: Bool, _ isSelected: DaySelection?) -> Day) {
@@ -41,6 +41,7 @@ public struct CalendarView<Day, Weekday, Header>: View where Day: View, Weekday:
         self._selection = selection
         self.calendar = calendar
         self.type = type
+        self.colorSet = colorSet
         self.headerView = headerView
         self.weekdaysView = weekdaysView
         self.dayView = dayView
@@ -54,21 +55,22 @@ public struct CalendarView<Day, Weekday, Header>: View where Day: View, Weekday:
                 weekdaysView(calendar)
             }
             CalendarContentView<Day>(type: type,
-                                     selection: $selection, 
-                                     previewDate: date, 
-                                     calendar: calendar,  
+                                     selection: $selection,
+                                     previewDate: date,
+                                     calendar: calendar,
                                      dayView: dayView)
             .selectionEnabled(isSelectionEnabled)
             .multiselectionEnabled(isMultiselectionEnabled)
-        }.onAppear {
+        }
+        .task {
             date = date.normalized()
         }
     }
 }
 
-// MARK: Modifiers 
+// MARK: Modifiers
 
-extension CalendarView {    
+extension CalendarView {
     /// Sets the calendar used for the view.
     ///
     /// - Parameter calendar: The calendar to use.
@@ -124,7 +126,7 @@ extension CalendarView {
     }
 }
 
-// MARK: Default initialisers 
+// MARK: Default initialisers
 
 extension CalendarView where Day == DefaultDayView, Header == DefaultCalendarHeaderView, Weekday == DefaultWeekdaysHeaderView {
     /// Initializes a calendar view with default configurations.
@@ -140,25 +142,25 @@ extension CalendarView where Day == DefaultDayView, Header == DefaultCalendarHea
                 selection: Binding<ClosedRange<Date>?> = .constant(nil),
                 calendar: Calendar = Calendar(identifier: .gregorian),
                 type: CalendarType = .monthly,
-                colorSet: CalendarColorSet = DefaultCalendarColorSet(),
+                colorSet: CalendarColorSet,
                 contentColorIndicator: @escaping (_ date: Date) -> Color? = {_ in return nil }) {
         self.init(date: date,
-                  selection: selection, 
-                  calendar: calendar, 
+                  selection: selection,
+                  calendar: calendar,
                   type: type,
                   headerView: { date, calendar in
-            DefaultCalendarHeaderView(date, 
-                                      calendar: calendar, 
-                                      type: type, 
+            DefaultCalendarHeaderView(date,
+                                      calendar: calendar,
+                                      type: type,
                                       colorSet: colorSet)
         }, weekdaysView: { calendar in
-            DefaultWeekdaysHeaderView(headerTextColor: colorSet.weekdayHeaderColor, 
+            DefaultWeekdaysHeaderView(headerTextColor: colorSet.weekdayHeaderColor,
                                       calendar: calendar)
         }) { date, calendar, isDateInMonth, isSelected in
             DefaultDayView(date: date,
                            calendar: calendar,
                            isDateInMonth: isDateInMonth,
-                           isSelected: isSelected, 
+                           isSelected: isSelected,
                            colorSet: colorSet,
                            contentColor: contentColorIndicator(date))
         }

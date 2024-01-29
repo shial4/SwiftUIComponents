@@ -20,10 +20,12 @@ public struct DefaultCalendarHeaderView: View {
     ///   - calendar: The calendar to be used.
     ///   - type: The calendar type.
     ///   - colorSet: The color set for the header view.
-    public init(_ date: Binding<Date>, 
-                calendar: Calendar, 
-                type: CalendarType, 
-                colorSet: CalendarColorSet = DefaultCalendarColorSet()) {
+    public init(
+        _ date: Binding<Date>,
+        calendar: Calendar,
+        type: CalendarType,
+        colorSet: CalendarColorSet = DefaultCalendarColorSet()
+    ) {
         self._previewDate = date
         self.calendar = calendar
         self.colorSet = colorSet
@@ -36,14 +38,15 @@ public struct DefaultCalendarHeaderView: View {
                 Chevron(thickness: 0.25)
                     .fill(colorSet.headerButtonColors)
                     .frame(width: 12, height: 18)
-                    .rotationEffect(Angle(degrees: 180), anchor: .center)
+                    .rotationEffect(Angle(degrees: 180), anchor: UnitPoint.center)
                     .padding(8)
                     .contentShape(Rectangle())
             }.buttonStyle(PlainButtonStyle())
             Spacer()
             Text(previewDate, formatter: formatter)
-                .font(.system(.body).weight(.semibold))
+                .font(Font.system(Font.TextStyle.body).weight(Font.Weight.semibold))
                 .lineLimit(1)
+                .foregroundColor(colorSet.headerButtonColors)
             Spacer()
             Button(action: nextTimePeriod) {
                 Chevron(thickness: 0.25)
@@ -59,22 +62,22 @@ public struct DefaultCalendarHeaderView: View {
     private func previousTimePeriod() {
         switch type {
         case .yearly:
-            previewDate = calendar.date(byAdding: .year, value: -1, to: previewDate) ?? previewDate
+            previewDate = calendar.date(byAdding: Calendar.Component.year, value: -1, to: previewDate) ?? previewDate
         case .monthly:
-            previewDate = calendar.date(byAdding: .month, value: -1, to: previewDate) ?? previewDate
+            previewDate = calendar.date(byAdding: Calendar.Component.month, value: -1, to: previewDate) ?? previewDate
         case .weekly:
-            previewDate = calendar.date(byAdding: .day, value: -7, to: previewDate) ?? previewDate
+            previewDate = calendar.date(byAdding: Calendar.Component.day, value: -7, to: previewDate) ?? previewDate
         }
     }
     
     private func nextTimePeriod() {
         switch type {
         case .yearly:
-            previewDate = calendar.date(byAdding: .year, value: 1, to: previewDate) ?? previewDate
+            previewDate = calendar.date(byAdding: Calendar.Component.year, value: 1, to: previewDate) ?? previewDate
         case .monthly:
-            previewDate = calendar.date(byAdding: .month, value: 1, to: previewDate) ?? previewDate
+            previewDate = calendar.date(byAdding: Calendar.Component.month, value: 1, to: previewDate) ?? previewDate
         case .weekly:
-            previewDate = calendar.date(byAdding: .day, value: 7, to: previewDate) ?? previewDate
+            previewDate = calendar.date(byAdding: Calendar.Component.day, value: 7, to: previewDate) ?? previewDate
         }
     }
 }

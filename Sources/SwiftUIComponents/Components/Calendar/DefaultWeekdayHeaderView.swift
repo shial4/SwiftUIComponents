@@ -28,7 +28,7 @@ public struct DefaultWeekdaysHeaderView: View {
             ForEach(weekRange, id: \.self) { index in
                 Text(calendar.shortWeekdaySymbols[index])
                     .foregroundColor(headerTextColor)
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: Double.infinity)
             }
         }
     }

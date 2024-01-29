@@ -25,7 +25,7 @@ public struct CalendarContentView<Day>: View where Day: View {
     }
     
     private var numberOfMonths: Int {
-        guard let range = calendar.range(of: .month, in: .year, for: previewDate) else {
+        guard let range = calendar.range(of: Calendar.Component.month, in: Calendar.Component.year, for: previewDate) else {
             return 0
         }
         return range.count
@@ -44,8 +44,8 @@ public struct CalendarContentView<Day>: View where Day: View {
     ///   - calendar: The calendar to use for the view.
     ///   - dayView: A closure that returns the day view for the calendar content view.
     public init(type: CalendarType = .yearly(3),
-                selection: Binding<ClosedRange<Date>?>, 
-                previewDate: Date, 
+                selection: Binding<ClosedRange<Date>?>,
+                previewDate: Date,
                 calendar: Calendar,
                 dayView: @escaping (_ date: Date, _ calendar: Calendar, _ isDateInMonth: Bool, _ isSelected: DaySelection?) -> Day) {
         self.type = type
@@ -77,9 +77,9 @@ public struct CalendarContentView<Day>: View where Day: View {
 
                     .background( GeometryReader { proxy in
                         Rectangle()
-                            .foregroundColor(.clear)
+                            .foregroundColor(Color.clear)
                             .onChange(of: hoverPoint, perform: { newValue in
-                                if let value = newValue, proxy.frame(in: .named("calendar.coordinate.space")).contains(value) {
+                                if let value = newValue, proxy.frame(in: CoordinateSpace.named("calendar.coordinate.space")).contains(value) {
                                     updateSelectionIfNeeded(date)
                                 }
                             })
@@ -100,9 +100,9 @@ public struct CalendarContentView<Day>: View where Day: View {
                         dayView(date, calendar, previewDate.month(calendar) == date.month(calendar), selection(for: date))
                             .background( GeometryReader { proxy in
                                 Rectangle()
-                                    .foregroundColor(.clear)
+                                    .foregroundColor(Color.clear)
                                     .onChange(of: hoverPoint, perform: { newValue in
-                                        if let value = newValue, proxy.frame(in: .named("calendar.coordinate.space")).contains(value) {
+                                        if let value = newValue, proxy.frame(in: CoordinateSpace.named("calendar.coordinate.space")).contains(value) {
                                             updateSelectionIfNeeded(date)
                                         }
                                     })
@@ -117,9 +117,9 @@ public struct CalendarContentView<Day>: View where Day: View {
     }
     
     private func yearly(_ previewDate: Date, columns: Int) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: HorizontalAlignment.leading, spacing: 0) {
             ForEach(0..<(numberOfMonths / columns), id: \.self) { rowIndex in
-                HStack(alignment: .top, spacing: 0) {
+                HStack(alignment: VerticalAlignment.top, spacing: 0) {
                     ForEach(0..<columns, id: \.self) { columnIndex in
                         let month = rowIndex * columns + columnIndex + 1
                         let date = previewDate.shiftToMonth(month, calendar: calendar)
@@ -127,8 +127,8 @@ public struct CalendarContentView<Day>: View where Day: View {
                             Text(date, formatter: formatterMonth)
                                 .lineLimit(1)
                             monthly(date)
-                                .padding(.vertical, 8)
-                                .padding(.horizontal, columns > 1 ? 8 : 0)
+                                .padding(Edge.Set.vertical, 8)
+                                .padding(Edge.Set.horizontal, columns > 1 ? 8 : 0)
                         }
                     }
                 }
@@ -136,10 +136,10 @@ public struct CalendarContentView<Day>: View where Day: View {
         }
     }
     
-    // MARK: Gestures 
+    // MARK: Gestures
     private func onSwipe() -> some Gesture {
-        DragGesture(minimumDistance: 0, 
-                    coordinateSpace: .named("calendar.coordinate.space"))
+        DragGesture(minimumDistance: 0,
+                    coordinateSpace: CoordinateSpace.named("calendar.coordinate.space"))
             .onChanged({ value in
                 hoverPoint = value.location
             }).onEnded({ value in
@@ -148,7 +148,7 @@ public struct CalendarContentView<Day>: View where Day: View {
     }
     
     private func onDayTap(_ date: Date) -> some Gesture {
-        TapGesture().onEnded { 
+        TapGesture().onEnded {
             guard isMultiselectionEnabled, let oldSelection = selection else {
                 selection = date...date
                 return
@@ -166,16 +166,16 @@ public struct CalendarContentView<Day>: View where Day: View {
         }
     }
     
-    // MARK: Private 
+    // MARK: Private
     private func numberOfDays(of date: Date) -> Int {
-        guard let range = calendar.range(of: .day, in: .month, for: date) else {
+        guard let range = calendar.range(of: Calendar.Component.day, in: Calendar.Component.month, for: date) else {
             return 0
         }
         return range.count
     }
     
     private func numberOfWeeks(of date: Date) -> Int {
-        guard let range = calendar.range(of: .weekOfMonth, in: .month, for: date) else {
+        guard let range = calendar.range(of: Calendar.Component.weekOfMonth, in: Calendar.Component.month, for: date) else {
             return 0
         }
         return range.count
@@ -220,7 +220,7 @@ public struct CalendarContentView<Day>: View where Day: View {
         } else {
             offset = week * numberOfWeekdays + day - currentDay - (shift - firstWeekday)
         }
-        return calendar.date(byAdding: .day, value: offset, to: date) ?? date
+        return calendar.date(byAdding: Calendar.Component.day, value: offset, to: date) ?? date
     }
 }
 
@@ -251,11 +251,11 @@ extension CalendarContentView {
 struct CalendarContentView_Previews: PreviewProvider {
     static var previews: some View {
         CalendarContentView(selection: .constant(nil), previewDate: Date(), calendar: Calendar(identifier: .gregorian)) { date, calendar, isDateInMonth, isSelected in
-            DefaultDayView(date: date, 
-                           calendar: calendar, 
-                           isDateInMonth: isDateInMonth, 
-                           isSelected: isSelected, 
-                           colorSet: DefaultCalendarColorSet(), 
+            DefaultDayView(date: date,
+                           calendar: calendar,
+                           isDateInMonth: isDateInMonth,
+                           isSelected: isSelected,
+                           colorSet: DefaultCalendarColorSet(),
                            contentColor: .orange)
         }
     }
