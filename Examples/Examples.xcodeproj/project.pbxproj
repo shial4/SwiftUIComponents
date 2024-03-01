@@ -18,6 +18,7 @@
 		ADAF1A122A4EC47D00539BAB /* CheckboxExampleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADAF1A0C2A4EC47D00539BAB /* CheckboxExampleView.swift */; };
 		ADAF1A132A4EC47D00539BAB /* ProgressExampleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADAF1A0D2A4EC47D00539BAB /* ProgressExampleView.swift */; };
 		ADAF1A1A2A4EC65400539BAB /* SwiftUIComponents in Frameworks */ = {isa = PBXBuildFile; productRef = ADAF1A192A4EC65400539BAB /* SwiftUIComponents */; };
+		ADBF959A2B91A097005767A4 /* LabelExampleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADBF95992B91A097005767A4 /* LabelExampleView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -34,6 +35,7 @@
 		ADAF1A0C2A4EC47D00539BAB /* CheckboxExampleView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CheckboxExampleView.swift; sourceTree = "<group>"; };
 		ADAF1A0D2A4EC47D00539BAB /* ProgressExampleView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ProgressExampleView.swift; sourceTree = "<group>"; };
 		ADAF1A172A4EC5EC00539BAB /* SwiftUIComponents */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = SwiftUIComponents; path = ..; sourceTree = "<group>"; };
+		ADBF95992B91A097005767A4 /* LabelExampleView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LabelExampleView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -90,6 +92,7 @@
 		ADAF1A072A4EC45A00539BAB /* ViewExamples */ = {
 			isa = PBXGroup;
 			children = (
+				ADBF95992B91A097005767A4 /* LabelExampleView.swift */,
 				ADAF1A092A4EC47D00539BAB /* BadgeExampleView.swift */,
 				ADAF1A0A2A4EC47D00539BAB /* CalendarExampleView.swift */,
 				ADAF1A0C2A4EC47D00539BAB /* CheckboxExampleView.swift */,
@@ -192,6 +195,7 @@
 				ADAF1A132A4EC47D00539BAB /* ProgressExampleView.swift in Sources */,
 				ADAF1A112A4EC47D00539BAB /* SliderExampleView.swift in Sources */,
 				ADAF19FB2A4EC3F000539BAB /* ContentView.swift in Sources */,
+				ADBF959A2B91A097005767A4 /* LabelExampleView.swift in Sources */,
 				ADAF1A122A4EC47D00539BAB /* CheckboxExampleView.swift in Sources */,
 				ADAF1A0E2A4EC47D00539BAB /* RatingExampleView.swift in Sources */,
 				ADAF1A102A4EC47D00539BAB /* CalendarExampleView.swift in Sources */,

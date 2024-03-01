@@ -142,7 +142,7 @@ extension CalendarView where Day == DefaultDayView, Header == DefaultCalendarHea
                 selection: Binding<ClosedRange<Date>?> = .constant(nil),
                 calendar: Calendar = Calendar(identifier: .gregorian),
                 type: CalendarType = .monthly,
-                colorSet: CalendarColorSet,
+                colorSet: CalendarColorSet = DefaultCalendarColorSet(),
                 contentColorIndicator: @escaping (_ date: Date) -> Color? = {_ in return nil }) {
         self.init(date: date,
                   selection: selection,

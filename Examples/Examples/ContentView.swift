@@ -9,7 +9,7 @@ import SwiftUI
 
 struct ContentView: View {
     private enum NavigationDestinations {
-        case calendar, progress, checkbox, rating, badge, slider
+        case calendar, progress, checkbox, rating, badge, slider, labels
     }
     
     var body: some View {
@@ -21,6 +21,7 @@ struct ContentView: View {
                 listElement(label: "Checkbox", destination: .checkbox)
                 listElement(label: "Rating", destination: .rating)
                 listElement(label: "Badges", destination: .badge)
+                listElement(label: "Labels", destination: .labels)
             }
         }
     }
@@ -39,6 +40,8 @@ struct ContentView: View {
                 ProgressExampleView()
             } else if destination == .slider {
                 SliderExampleView()
+            } else if destination == .labels {
+                LabelExampleView()
             } else {
                 Text("Nothing here")
             }
