@@ -1,6 +1,6 @@
 import Foundation
 
-extension Date {
+public extension Date {
     func compare(with date: Date, calendar: Calendar = Calendar(identifier: .gregorian)) -> Bool {
         let componentsLhs = calendar.dateComponents([.year, .month, .day], from: self)
         let componentsRhs = calendar.dateComponents([.year, .month, .day], from: date)
