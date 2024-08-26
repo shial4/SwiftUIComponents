@@ -1,6 +1,7 @@
 import SwiftUI
 
 public struct XMark: Shape {
+    public init() {}
     public func path(in rect: CGRect) -> Path {
         var path = Path()
 
