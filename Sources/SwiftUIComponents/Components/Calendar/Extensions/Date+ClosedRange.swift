@@ -1,6 +1,6 @@
 import Foundation
 
-extension ClosedRange where Bound == Date {
+public extension ClosedRange where Bound == Date {
     func span(calendar: Calendar, units: Set<Calendar.Component>) -> Int {
         let date1 = calendar.startOfDay(for: lowerBound)
         let date2 = calendar.startOfDay(for: upperBound) 
