@@ -14,4 +14,11 @@ extension View {
             self
         }
     }
+
+    /// Applies the given closure modifier.
+    /// - Parameter closure: The `View` modifier to apply.
+    /// - Returns:  The modified `View`
+    func modified<Content: View>(@ViewBuilder _ closure: (Self) -> Content) -> some View {
+        closure(self)
+    }
 }
