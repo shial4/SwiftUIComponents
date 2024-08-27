@@ -86,12 +86,11 @@ public struct DefaultDayView: View {
                                         anchor: UnitPoint.topLeading)
                 }
         }
-        .aspectRatio(1, contentMode: ContentMode.fit)
     }
     
     var dayTextView: some View {
         Text(date, formatter: formatter)
-            .frame(maxWidth: Double.infinity)
+            .frame(maxWidth: Double.infinity, maxHeight: .infinity)
             .if(calendar.isDateInToday(date)) { content in
                 content.foregroundColor(colorSet.todayColor)
             }

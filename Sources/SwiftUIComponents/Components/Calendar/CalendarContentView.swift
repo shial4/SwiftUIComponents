@@ -43,7 +43,7 @@ public struct CalendarContentView<Day>: View where Day: View {
     ///   - previewDate: The date to preview.
     ///   - calendar: The calendar to use for the view.
     ///   - dayView: A closure that returns the day view for the calendar content view.
-    public init(type: CalendarType = .yearly(3),
+    public init(type: CalendarType = .monthly,
                 selection: Binding<ClosedRange<Date>?>,
                 previewDate: Date,
                 calendar: Calendar,
@@ -92,8 +92,10 @@ public struct CalendarContentView<Day>: View where Day: View {
     }
     
     private func monthly(_ previewDate: Date) -> some View {
-        VStack(spacing: 0) {
-            ForEach(0..<numberOfWeeks(of: previewDate), id: \.self) { weekIndex in
+        let weeksCount = numberOfWeeks(of: previewDate)
+        let remainingSpacers = 6 - weeksCount
+        return VStack(spacing: 0) {
+            ForEach(0..<weeksCount, id: \.self) { weekIndex in
                 HStack(spacing: 0) {
                     ForEach(1..<numberOfWeekdays + 1, id: \.self) { dayIndex in
                         let date = date(for: dayIndex, in: weekIndex, of: previewDate)
@@ -110,6 +112,12 @@ public struct CalendarContentView<Day>: View where Day: View {
                             .contentShape(Rectangle())
                             .gesture(isSelectionEnabled ? onDayTap(date) : nil)
                     }
+                }
+            }
+            if remainingSpacers > 0 {
+                ForEach(0..<remainingSpacers) { _ in
+                    Spacer()
+                        .frame(maxWidth: Double.infinity)
                 }
             }
         }
