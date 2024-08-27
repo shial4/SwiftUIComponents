@@ -150,7 +150,7 @@ public struct CalendarContentView<Day>: View where Day: View {
     private func onDayTap(_ date: Date) -> some Gesture {
         TapGesture().onEnded {
             guard isMultiselectionEnabled, let oldSelection = selection else {
-                selection = date...date
+                selection = selection?.contains(date) == true ? nil : date...date
                 return
             }
             
