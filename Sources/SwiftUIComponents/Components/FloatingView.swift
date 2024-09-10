@@ -1,9 +1,8 @@
 import SwiftUI
 
-@Observable
-class FloatingViewModel {
+class FloatingViewModel: ObservableObject {
     static let shared = FloatingViewModel()
-    var builders: [UUID: () -> AnyView] = [:]
+    @Published var builders: [UUID: () -> AnyView] = [:]
     
     func addBuilder(_ builder: @escaping () -> AnyView, for id: UUID) {
         builders[id] = builder
@@ -15,7 +14,7 @@ class FloatingViewModel {
 }
 
 struct FloatingViewContainer: ViewModifier {
-    @State var viewModel = FloatingViewModel.shared
+    @StateObject var viewModel = FloatingViewModel.shared
     
     func body(content: Content) -> some View {
         ZStack {
