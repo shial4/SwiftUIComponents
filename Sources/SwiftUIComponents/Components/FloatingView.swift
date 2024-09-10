@@ -1,10 +1,11 @@
 import SwiftUI
 
+
 class FloatingViewModel: ObservableObject {
     static let shared = FloatingViewModel()
     @Published var builders: [UUID: () -> AnyView] = [:]
     
-    func addBuilder(_ builder: @escaping () -> AnyView, for id: UUID) {
+    func add(for id: UUID, builder: @escaping () -> AnyView) {
         builders[id] = builder
     }
     
@@ -20,11 +21,9 @@ struct FloatingViewContainer: ViewModifier {
         ZStack {
             content
             ForEach(Array(viewModel.builders.keys.enumerated()), id: \.element.uuidString) { index, key in
-                viewModel.builders[key]!()
-                    .padding()
-                    .background(.quaternary, in: Capsule())
-                    .shadow(radius: 5)
-                    .offset(x: CGFloat(index * 20), y: CGFloat(index * 20)) // Offset to avoid overlap
+                if let builder = viewModel.builders[key] {
+                    builder()
+                }
             }
         }
     }
@@ -38,7 +37,7 @@ struct FloatingViewModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .onAppear {
-                FloatingViewModel.shared.addBuilder(builder, for: uuid)
+                FloatingViewModel.shared.add(for: uuid, builder: builder)
             }
             .onDisappear {
                 FloatingViewModel.shared.removeBuilder(for: uuid)
@@ -51,9 +50,13 @@ public extension View {
         self.modifier(FloatingViewContainer())
     }
     
-    func floating(_ builder: @escaping () -> some View) -> some View {
+    func floating(alignment: Alignment = .center, _ builder: @escaping () -> some View) -> some View {
         let wrappedBuilder: () -> AnyView = { AnyView(builder()) }
-        return self.modifier(FloatingViewModifier(builder: wrappedBuilder))
+        return self.modifier(
+            FloatingViewModifier(
+                builder: wrappedBuilder
+            )
+        )
     }
 }
 
