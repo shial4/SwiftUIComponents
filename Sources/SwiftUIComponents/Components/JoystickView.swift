@@ -1,24 +1,24 @@
 import SwiftUI
 
-struct JoystickView: View {
+public struct JoystickView: View {
+    @Binding private var translation: CGPoint?
     @State private var dragPosition: CGPoint? = nil
 
-    typealias JoystickAction = (CGPoint?) -> Void
-    private var translationAction: JoystickAction?
     private var gripColor: Color = .white
+    private var accetColor: Color = .black
     
-    init(_ translationAction: JoystickAction? = nil) {
-        self.translationAction = translationAction
+    public init(_ translation: Binding<CGPoint?>? = nil) {
+        _translation = translation ?? .constant(.zero)
     }
 
-    var body: some View {
+    public var body: some View {
         GeometryReader { proxy in
             Circle()
-                .strokeBorder(Color.black.opacity(0.4))
-                .background(Circle().fill(Color.black.opacity(0.2)))
+                .strokeBorder(accetColor.opacity(0.4))
+                .background(Circle().fill(accetColor.opacity(0.2)))
                 .overlay(
                     Circle()
-                        .strokeBorder(Color.black)
+                        .strokeBorder(accetColor)
                         .background(Circle().fill(gripColor))
                         .scaleEffect(0.5)
                         .position(dragPosition ?? CGPoint(x: proxy.frame(in: .local).midX, y: proxy.frame(in: .local).midY))
@@ -36,10 +36,10 @@ struct JoystickView: View {
                             }
                             let translation = CGPoint(x: location.x - center.x,
                                                       y: location.y - center.y)
-                            translationAction?(translation)
+                            self.translation = translation
                         }).onEnded({ value in
                             dragPosition = nil
-                            translationAction?(nil)
+                            translation = nil
                         })
                 )
         }
@@ -77,16 +77,22 @@ struct JoystickView: View {
 }
 
 // MARK: - View Modifiers
-extension JoystickView {
-    func onTranslation(_ action: JoystickAction?) -> Self {
+public extension JoystickView {
+    func onTranslation(_ translation: Binding<CGPoint?>) -> Self {
         var view = self
-        view.translationAction = action
+        view._translation = translation
         return view
     }
     
     func gripColor(_ color: Color) -> Self {
         var view = self
         view.gripColor = color
+        return view
+    }
+    
+    func accetColor(_ color: Color) -> Self {
+        var view = self
+        view.accetColor = color
         return view
     }
 }
