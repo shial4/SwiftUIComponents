@@ -1,14 +1,14 @@
 import SwiftUI
 
 public struct JoystickView: View {
-    @Binding private var translation: CGPoint?
+    @Binding public var translation: CGPoint
     @State private var dragPosition: CGPoint? = nil
 
     private var gripColor: Color = .white
     private var accetColor: Color = .black
     
-    public init(_ translation: Binding<CGPoint?>? = nil) {
-        _translation = translation ?? .constant(.zero)
+    public init(translation: Binding<CGPoint>) {
+        self._translation = translation
     }
 
     public var body: some View {
@@ -24,7 +24,7 @@ public struct JoystickView: View {
                         .position(dragPosition ?? CGPoint(x: proxy.frame(in: .local).midX, y: proxy.frame(in: .local).midY))
                 ).gesture(
                     DragGesture(coordinateSpace: .local)
-                        .onChanged({ value in
+                        .onChanged { value in
                             let center = CGPoint(x: proxy.frame(in: .local).midX, y: proxy.frame(in: .local).midY)
                             let location = CGPoint(x: center.x + value.translation.width, y: center.y + value.translation.height)
                             let radius = min(proxy.size.width, proxy.size.height) / 4
@@ -34,13 +34,16 @@ public struct JoystickView: View {
                             } else {
                                 dragPosition = location
                             }
-                            let translation = CGPoint(x: location.x - center.x,
-                                                      y: location.y - center.y)
+                            let translation = CGPoint(
+                                x: location.x - center.x,
+                                y: location.y - center.y
+                            )
                             self.translation = translation
-                        }).onEnded({ value in
+                        }
+                        .onEnded { value in
                             dragPosition = nil
-                            translation = nil
-                        })
+                            translation = .zero
+                        }
                 )
         }
     }
@@ -78,12 +81,6 @@ public struct JoystickView: View {
 
 // MARK: - View Modifiers
 public extension JoystickView {
-    func onTranslation(_ translation: Binding<CGPoint?>) -> Self {
-        var view = self
-        view._translation = translation
-        return view
-    }
-    
     func gripColor(_ color: Color) -> Self {
         var view = self
         view.gripColor = color
@@ -100,7 +97,7 @@ public extension JoystickView {
 // MARK: - Previews
 struct JoystickView_Previews: PreviewProvider {
     static var previews: some View {
-        JoystickView()
+        JoystickView(translation: .constant(.zero))
             .frame(width: 180, height: 180)
     }
 }
