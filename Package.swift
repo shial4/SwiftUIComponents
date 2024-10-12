@@ -27,7 +27,10 @@ let package = Package(
         ),
         .testTarget(
             name: "SwiftUIComponentsTests",
-            dependencies: ["SwiftUIComponents"],
+            dependencies: [
+                "SwiftUIComponents",
+                .product(name: "SkipTest", package: "skip")
+            ],
             plugins: [.plugin(name: "skipstone", package: "skip")]
         ),
     ]
