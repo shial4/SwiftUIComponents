@@ -7,8 +7,8 @@ public extension View {
     ///   - condition: The condition to evaluate.
     ///   - modifier: The `View` modifier to apply.
     /// - Returns: Either the original `View` or the modified `View` if the condition is `true`.
-    @ViewBuilder func `if`<Content: View>(_ condition: @autoclosure () -> Bool, modifier: (Self) -> Content) -> some View {
-        if condition() {
+    @ViewBuilder func `if`<Content: View>(_ condition: Bool, modifier: (Self) -> Content) -> some View {
+        if condition {
             modifier(self)
         } else {
             self

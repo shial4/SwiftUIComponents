@@ -49,7 +49,7 @@ public struct DefaultDayView: View {
     }
     
     public var body: some View {
-        GeometryReader { proxy in
+        let result = GeometryReader { proxy in
             dayTextView
                 .padding(4)
                 .if(contentColor != nil) { content in
@@ -86,11 +86,12 @@ public struct DefaultDayView: View {
                                         anchor: UnitPoint.topLeading)
                 }
         }
+        return result
     }
     
     var dayTextView: some View {
         Text(date, formatter: formatter)
-            .frame(maxWidth: Double.infinity, maxHeight: .infinity)
+            .frame(maxWidth: Double.infinity, maxHeight: Double.infinity)
             .if(calendar.isDateInToday(date)) { content in
                 content.foregroundColor(colorSet.todayColor)
             }

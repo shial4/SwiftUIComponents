@@ -56,7 +56,7 @@ public struct CalendarContentView<Day>: View where Day: View {
     }
     
     public var body: some View {
-        Group {
+        let result = Group {
             switch type {
             case .yearly(let columns):
                 yearly(previewDate, columns: columns)
@@ -67,6 +67,7 @@ public struct CalendarContentView<Day>: View where Day: View {
             }
         }
         .coordinateSpace(name: "calendar.coordinate.space")
+        return result
     }
     
     private var weekly: some View {
@@ -93,7 +94,7 @@ public struct CalendarContentView<Day>: View where Day: View {
     
     private func monthly(_ previewDate: Date) -> some View {
         let weeksCount = numberOfWeeks(of: previewDate)
-        let remainingSpacers = 6 - weeksCount
+        let remainingSpacers: Int = 6 - weeksCount
         return VStack(spacing: 0) {
             ForEach(0..<weeksCount, id: \.self) { weekIndex in
                 HStack(spacing: 0) {
@@ -115,7 +116,7 @@ public struct CalendarContentView<Day>: View where Day: View {
                 }
             }
             if remainingSpacers > 0 {
-                ForEach(0..<remainingSpacers) { _ in
+                ForEach(0..<remainingSpacers, id: \.self) { _ in
                     Spacer()
                         .frame(maxWidth: Double.infinity)
                 }
@@ -162,7 +163,8 @@ public struct CalendarContentView<Day>: View where Day: View {
                 return
             }
             
-            if oldSelection.contains(date) || oldSelection.span(calendar: calendar, units: [.day]) != 0 {
+            if oldSelection.contains(date)
+                || oldSelection.span(calendar: calendar, units: [Calendar.Component.day]) != 0 {
                 selection = nil
             } else if oldSelection.lowerBound > date {
                 selection = date...oldSelection.upperBound
@@ -204,7 +206,7 @@ public struct CalendarContentView<Day>: View where Day: View {
     
     private func selection(for date: Date) -> DaySelection? {
         guard let selection = selection else { return nil }
-        let span = selection.span(calendar: calendar, units: [.day])
+        let span = selection.span(calendar: calendar, units: [Calendar.Component.day])
         if selection.lowerBound.compare(with: date, calendar: calendar), span > 0 {
             return .leading
         } else if selection.upperBound.compare(with: date, calendar: calendar), span > 0 {

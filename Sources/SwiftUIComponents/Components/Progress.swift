@@ -36,13 +36,13 @@ public struct Progress<Content: Shape>: View {
      
      - Returns: A `Progress` view with the specified progress value, shape content, and stroke style.
      */
-    public init(progress: Binding<Double>, content: Content, lineWidth: CGFloat = 6) {
+    public init(progress: Binding<Double>, content: Content, lineWidth: Double = 6) {
         self._progress = progress
         self.content = content
         self.style = StrokeStyle(lineWidth: lineWidth, 
-                                 lineCap: .round, 
-                                 lineJoin: .round, 
-                                 miterLimit: 0, 
+                                 lineCap: CGLineCap.round,
+                                 lineJoin: CGLineJoin.round,
+                                 miterLimit: 0,
                                  dash: [], 
                                  dashPhase: 0)
     }
@@ -64,13 +64,14 @@ public struct Progress<Content: Shape>: View {
     }
     
     public var body: some View {
-        ZStack {
+        let result = ZStack {
             content
-                .stroke(.background, style: style)
+                .stroke(BackgroundStyle.background, style: style)
             content
-                .trim(from: 0, to: CGFloat(progress))
-                .stroke(.foreground, style: style)
+                .trim(from: 0, to: Double(progress))
+                .stroke(ForegroundStyle.foreground, style: style)
         }
+        return result
     }
 }
 

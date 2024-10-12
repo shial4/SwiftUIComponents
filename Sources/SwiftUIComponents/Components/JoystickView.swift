@@ -3,16 +3,16 @@ import SwiftUI
 public struct JoystickView: View {
     @Binding public var translation: CGPoint
     @State private var dragPosition: CGPoint? = nil
-
-    private var gripColor: Color = .white
-    private var accetColor: Color = .black
+    
+    private var gripColor: Color = Color.white
+    private var accetColor: Color = Color.black
     
     public init(translation: Binding<CGPoint>) {
         self._translation = translation
     }
-
+    
     public var body: some View {
-        GeometryReader { proxy in
+        let result = GeometryReader { proxy in
             Circle()
                 .strokeBorder(accetColor.opacity(0.4))
                 .background(Circle().fill(accetColor.opacity(0.2)))
@@ -21,30 +21,41 @@ public struct JoystickView: View {
                         .strokeBorder(accetColor)
                         .background(Circle().fill(gripColor))
                         .scaleEffect(0.5)
-                        .position(dragPosition ?? CGPoint(x: proxy.frame(in: .local).midX, y: proxy.frame(in: .local).midY))
-                ).gesture(
-                    DragGesture(coordinateSpace: .local)
-                        .onChanged { value in
-                            let center = CGPoint(x: proxy.frame(in: .local).midX, y: proxy.frame(in: .local).midY)
-                            let location = CGPoint(x: center.x + value.translation.width, y: center.y + value.translation.height)
-                            let radius = min(proxy.size.width, proxy.size.height) / 4
-                            if let intersection = lineCircleIntersection(line: LWLine(start: center, end: location),
-                                                                         circle: LWCircle(center: center, radius: radius)).first {
-                                dragPosition = intersection
-                            } else {
-                                dragPosition = location
-                            }
-                            let translation = CGPoint(
-                                x: location.x - center.x,
-                                y: location.y - center.y
-                            )
-                            self.translation = translation
-                        }
-                        .onEnded { value in
-                            dragPosition = nil
-                            translation = .zero
-                        }
+                        .position(dragPosition ?? CGPoint(
+                            x: proxy.frame(in: CoordinateSpace.local).midX,
+                            y: proxy.frame(in: CoordinateSpace.local).midY
+                        ))
                 )
+                .gesture(dragGesture(proxy))
+        }
+        return result
+    }
+    
+    private func dragGesture(_ proxy: GeometryProxy) -> some Gesture {
+        DragGesture(coordinateSpace: CoordinateSpace.local)
+        .onChanged { value in
+            let center = CGPoint(
+                x: proxy.frame(in: CoordinateSpace.local).midX,
+                y: proxy.frame(in: CoordinateSpace.local).midY
+            )
+            let location = CGPoint(x: center.x + value.translation.width, y: center.y + value.translation.height)
+            let radius = min(proxy.size.width, proxy.size.height) / 4
+            if let intersection = lineCircleIntersection(
+                line: LWLine(start: center, end: location),
+                circle: LWCircle(center: center, radius: radius)
+            ).first {
+                dragPosition = intersection
+            } else {
+                dragPosition = location
+            }
+            let translation = CGPoint(
+                x: location.x - center.x,
+                y: location.y - center.y
+            )
+            self.translation = translation
+        }.onEnded { value in
+            dragPosition = nil
+            translation = .zero
         }
     }
     

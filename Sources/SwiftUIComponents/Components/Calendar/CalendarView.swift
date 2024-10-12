@@ -48,7 +48,7 @@ public struct CalendarView<Day, Weekday, Header>: View where Day: View, Weekday:
     }
     
     public var body: some View {
-        VStack {
+        let result = VStack {
             if case .yearly = type {
             } else {
                 headerView($date, calendar)
@@ -65,6 +65,7 @@ public struct CalendarView<Day, Weekday, Header>: View where Day: View, Weekday:
         .task {
             date = date.normalized()
         }
+        return result
     }
 }
 
@@ -127,7 +128,7 @@ extension CalendarView {
 }
 
 // MARK: Default initialisers
-
+#if !SKIP
 extension CalendarView where Day == DefaultDayView, Header == DefaultCalendarHeaderView, Weekday == DefaultWeekdaysHeaderView {
     /// Initializes a calendar view with default configurations.
     ///
@@ -166,3 +167,4 @@ extension CalendarView where Day == DefaultDayView, Header == DefaultCalendarHea
         }
     }
 }
+#endif

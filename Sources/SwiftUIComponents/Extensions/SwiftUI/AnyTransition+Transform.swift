@@ -15,8 +15,8 @@ extension AnyTransition {
         let active = FrameModifier(
             offset: CGSize(width: (from.midX - to.midX) / scale, height: (from.midY - to.midY) / scale),
             rotation: rotation,
-            scale: CGSize(width: from.width / (to.width.isZero ? .leastNonzeroMagnitude : to.width),
-                          height: from.height / (to.height.isZero ? .leastNonzeroMagnitude : to.height)),
+            scale: CGSize(width: from.width / (to.width.isZero ? Double.leastNonzeroMagnitude : to.width),
+                          height: from.height / (to.height.isZero ? Double.leastNonzeroMagnitude : to.height)),
             anchor: .center
         )
         return .modifier(active: active, identity: identity)

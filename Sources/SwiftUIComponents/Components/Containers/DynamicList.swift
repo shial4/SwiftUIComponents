@@ -65,7 +65,7 @@ public struct DynamicList<Content: View>: View {
     }
     
     public var body: some View {
-        GeometryReader { geometry in
+        let result = GeometryReader { geometry in
             listView(geometry.size)
                 .onChange(of: scrollOffset) { value in
                     guard scrollOffset != viewModel.scrollOffset else { return }
@@ -88,6 +88,7 @@ public struct DynamicList<Content: View>: View {
                     }
                 }
         }
+        return result
     }
     
     private var previousScrollOffset: Double {
@@ -192,23 +193,26 @@ public struct DynamicList<Content: View>: View {
         }
         
         return StackView(orientation: orientation) {
-            Spacer()
-                .frame(
-                    width: orientation == .horizontal ? padding : nil,
-                    height: orientation == .vertical ? padding : nil
-                )
-            ForEach(visibleRange, id: \.hashValue) { index in
-                cellBuilder(index)
+            let group = Group {
+                Spacer()
                     .frame(
-                        width: orientation == .horizontal ? length[index] : nil,
-                        height: orientation == .vertical ? length[index] : nil
+                        width: orientation == .horizontal ? padding : nil,
+                        height: orientation == .vertical ? padding : nil
                     )
-                    .transition(
-                        transition(index: index, start: start, endIndex: endIndex)
-                    )
-                    .background(Color.green)
-                    .border(Color.blue)
+                ForEach(visibleRange, id: \.hashValue) { index in
+                    cellBuilder(index)
+                        .frame(
+                            width: orientation == .horizontal ? length[index] : nil,
+                            height: orientation == .vertical ? length[index] : nil
+                        )
+                        .transition(
+                            transition(index: index, start: start, endIndex: endIndex)
+                        )
+                        .background(Color.green)
+                        .border(Color.blue)
+                }
             }
+            return group
         }
         .frame(maxWidth: Double.infinity, maxHeight: Double.infinity)
         .offset(x: orientation == .horizontal ? viewModel.scrollOffset : 0,
@@ -281,15 +285,18 @@ public struct StackView<Content: View>: View {
     }
     
     public var body: some View {
-        if orientation == .horizontal {
-            HStack(spacing: 0) {
-                content
-            }
-        } else {
-            VStack(spacing: 0) {
-                content
+        let result = Group {
+            if orientation == .horizontal {
+                HStack(spacing: 0) {
+                    content
+                }
+            } else {
+                VStack(spacing: 0) {
+                    content
+                }
             }
         }
+        return result
     }
 }
 

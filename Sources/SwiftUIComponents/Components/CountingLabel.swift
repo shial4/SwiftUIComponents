@@ -32,7 +32,7 @@ public struct CountingLabel: View {
         self.fromValues = fromValues
         self.toValues = toValues
         self.numbersCount = numbersCount
-        self.timer = Timer.publish(every: interval, on: .main, in: .common).autoconnect()
+        self.timer = Timer.publish(every: interval, on: RunLoop.main, in: RunLoop.Mode.common).autoconnect()
         
         guard numbersCount > 0 else {
             self.text = to
@@ -41,7 +41,7 @@ public struct CountingLabel: View {
     }
     
     public var body: some View {
-        Text(text)
+        let result = Text(text)
             .onReceive(timer) { input in
                 guard text != to else {
                     self.timer.upstream.connect().cancel()
@@ -71,6 +71,7 @@ public struct CountingLabel: View {
                     round = round + 1
                 }
             }
+        return result
     }
     
     // MARK: Helper Type

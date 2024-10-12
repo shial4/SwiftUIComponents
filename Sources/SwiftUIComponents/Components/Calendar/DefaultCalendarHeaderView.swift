@@ -33,7 +33,7 @@ public struct DefaultCalendarHeaderView: View {
     }
     
     public var body: some View {
-        HStack {
+        let result = HStack {
             Button(action: previousTimePeriod) {
                 Chevron(thickness: 0.25)
                     .fill(colorSet.headerButtonColors)
@@ -41,21 +41,28 @@ public struct DefaultCalendarHeaderView: View {
                     .rotationEffect(Angle(degrees: 180), anchor: UnitPoint.center)
                     .padding(8)
                     .contentShape(Rectangle())
-            }.buttonStyle(PlainButtonStyle())
+            }
+            .buttonStyle(PlainButtonStyle())
+            
             Spacer()
+            
             Text(previewDate, formatter: formatter)
                 .font(Font.system(Font.TextStyle.body).weight(Font.Weight.semibold))
                 .lineLimit(1)
                 .foregroundColor(colorSet.headerButtonColors)
+            
             Spacer()
+            
             Button(action: nextTimePeriod) {
                 Chevron(thickness: 0.25)
                     .fill(colorSet.headerButtonColors)
                     .frame(width: 12, height: 18)
                     .padding(8)
                     .contentShape(Rectangle())
-            }.buttonStyle(PlainButtonStyle())
+            }
+            .buttonStyle(PlainButtonStyle())
         }
+        return result
     }
     
     // MARK: Button Actions

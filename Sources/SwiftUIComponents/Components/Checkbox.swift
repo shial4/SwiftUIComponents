@@ -2,8 +2,10 @@ import SwiftUI
 
 /// A checkbox view with optional label.
 public struct Checkbox: View {
+#if !SKIP
     @Namespace private var animation
     @Environment(\.isEnabled) private var isEnabled
+#endif
     private var checked: Bool
     private var isFilled: Bool = true
     private let label: String?
@@ -27,40 +29,40 @@ public struct Checkbox: View {
     }
     
     public var body: some View {
-        HStack {
+        let result = HStack {
             GeometryReader { proxy in
                 if checked {
                     if isFilled {
                         RoundedRectangle(cornerRadius: proxy.size.height * 0.125)
-                            .fill(.foreground)
+                            .fill(ForegroundStyle.foreground)
                             .reverseMask {
                                 Tick(thickness: 0.125)
-                                    .stroke(.foreground, 
-                                            style: StrokeStyle(lineWidth: proxy.size.height * 0.125, 
-                                                               lineCap: .round, 
-                                                               lineJoin: .round))
+                                    .stroke(ForegroundStyle.foreground,
+                                            style: StrokeStyle(lineWidth: proxy.size.height * 0.125,
+                                                               lineCap: CGLineCap.round,
+                                                               lineJoin: CGLineJoin.round))
                             }
                             .opacity(isEnabled ? 1 : 0.4)
                             .matchedGeometryEffect(id: "color", in: animation)
                     } else {
                         RoundedRectangle(cornerRadius: proxy.size.height * 0.125)
-                            .strokeBorder(.foreground, lineWidth: proxy.size.height * 0.125)
+                            .strokeBorder(ForegroundStyle.foreground, lineWidth: proxy.size.height * 0.125)
                         Tick(thickness: 0.125)
-                            .stroke(.foreground, 
-                                    style: StrokeStyle(lineWidth: proxy.size.height * 0.125, 
-                                                       lineCap: .round, 
-                                                       lineJoin: .round))
+                            .stroke(ForegroundStyle.foreground,
+                                    style: StrokeStyle(lineWidth: proxy.size.height * 0.125,
+                                                       lineCap: CGLineCap.round, 
+                                                       lineJoin: CGLineJoin.round))
                             .opacity(isEnabled ? 1 : 0.4)
                             .matchedGeometryEffect(id: "color", in: animation)
                     }
                 } else {
                     RoundedRectangle(cornerRadius: proxy.size.height * 0.125)
-                        .strokeBorder(.foreground, lineWidth: proxy.size.height * 0.125)
+                        .strokeBorder(ForegroundStyle.foreground, lineWidth: proxy.size.height * 0.125)
                         .opacity(isEnabled ? 1 : 0.4)
                         .matchedGeometryEffect(id: "color", in: animation)
                 }
             }
-            .aspectRatio(1, contentMode: .fit)
+            .aspectRatio(1, contentMode: ContentMode.fit)
             .contentShape(Rectangle())
             
             if let label {
@@ -69,6 +71,7 @@ public struct Checkbox: View {
                     .opacity(isEnabled ? 1 : 0.4)
             }
         }
+        return result
     }
 }
 

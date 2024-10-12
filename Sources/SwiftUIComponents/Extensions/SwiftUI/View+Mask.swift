@@ -11,7 +11,7 @@ public extension View {
             Rectangle()
                 .overlay(alignment: alignment) {
                     mask()
-                        .blendMode(.destinationOut)
+                        .blendMode(BlendMode.destinationOut)
                 }
         }
     }

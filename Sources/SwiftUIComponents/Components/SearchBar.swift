@@ -6,12 +6,18 @@ public struct SearchBar: View {
     }
     
     @Binding var text: String
+#if !SKIP
     @FocusState private var focusedField: FocusedField?
+#endif
     
     let prompt: String
 
     var isEditing: Bool {
+#if SKIP
+        return true
+#else
         focusedField == .search
+#endif
     }
     
     public init(text: Binding<String>, prompt: String = "Search...") {
@@ -20,13 +26,13 @@ public struct SearchBar: View {
     }
     
     public var body: some View {
-        TextField(prompt, text: $text)
+        let result = TextField(prompt, text: $text)
             .padding(8)
-            .padding(.leading, 8)
-            .padding(.trailing, 34)
+            .padding(Edge.Set.leading, 8)
+            .padding(Edge.Set.trailing, 34)
             .background(Color.gray)
             .cornerRadius(8)
-            .overlay(alignment: .trailing) {
+            .overlay(alignment: Alignment.trailing) {
                 if isEditing {
                     Button(action: {
                         withAnimation {
@@ -41,12 +47,16 @@ public struct SearchBar: View {
                             .background(Color.white)
                             .clipShape(Circle())
                     }
-                    .padding(.trailing, 10)
+                    .padding(Edge.Set.trailing, 10)
                     .transition(AnyTransition.move(edge: Edge.trailing))
                 }
             }
-            .padding(.horizontal, 10)
+            .padding(Edge.Set.horizontal, 10)
+#if !SKIP
             .focused($focusedField, equals: FocusedField.search)
+#endif
+        return result
+            
     }
 }
 

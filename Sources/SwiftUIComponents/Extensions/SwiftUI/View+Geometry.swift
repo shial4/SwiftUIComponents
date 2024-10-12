@@ -43,7 +43,7 @@ extension View {
         background(
             GeometryReader { proxy in
                 Color.clear
-                    .preference(key: FramePreferenceKey.self, value: proxy.frame(in: .global))
+                    .preference(key: FramePreferenceKey.self, value: proxy.frame(in: CoordinateSpace.global))
             }
         )
         .onPreferenceChange(FramePreferenceKey.self, perform: onChange)
@@ -53,7 +53,7 @@ extension View {
         background(
             GeometryReader { proxy in
                 Color.clear
-                    .preference(key: FramePreferenceKey.self, value: proxy.frame(in: .global))
+                    .preference(key: FramePreferenceKey.self, value: proxy.frame(in: CoordinateSpace.global))
             }
         )
         .onPreferenceChange(FramePreferenceKey.self, perform: { value in

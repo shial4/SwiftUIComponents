@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 import Combine
 
+#if !SKIP
 @propertyWrapper
 public struct CodableAppStorage<Value: Codable>: DynamicProperty {
     @StateObject private var valuePublisher: ValuePublisher<Value>
@@ -21,21 +22,21 @@ public struct CodableAppStorage<Value: Codable>: DynamicProperty {
             self._valuePublisher = StateObject(wrappedValue: ValuePublisher(initialValue: defaultValue, key: key))
         }
     }
+}
 
-    private class ValuePublisher<T: Codable>: ObservableObject {
-        @Published var value: T {
-            didSet {
-                let data = try? JSONEncoder().encode(value)
-                UserDefaults.standard.setValue(data, forKey: key)
-            }
+private class ValuePublisher<T: Codable>: ObservableObject {
+    @Published var value: T {
+        didSet {
+            let data = try? JSONEncoder().encode(value)
+            UserDefaults.standard.setValue(data, forKey: key)
         }
+    }
 
-        let key: String
+    let key: String
 
-        init(initialValue: T, key: String) {
-            self.value = initialValue
-            self.key = key
-        }
+    init(initialValue: T, key: String) {
+        self.value = initialValue
+        self.key = key
     }
 }
 
@@ -55,3 +56,4 @@ public extension UserDefaults {
         return nil
     }
 }
+#endif

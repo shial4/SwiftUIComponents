@@ -5,7 +5,7 @@ public enum RectCorner : Sendable {
 }
 
 extension View {
-    func cornerRadius(_ radius: CGFloat, corners: RectCorner...) -> some View {
+    func cornerRadius(_ radius: Double, corners: RectCorner...) -> some View {
         clipShape(RoundedCorner(radius: radius, corners: Set(corners)))
     }
 }

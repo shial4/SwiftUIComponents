@@ -11,14 +11,22 @@ public extension ClosedRange where Bound == Date {
     func toArray(calendar: Calendar) -> [Date] {
         let date1 = calendar.startOfDay(for: lowerBound)
         let date2 = calendar.startOfDay(for: upperBound)
-        let components = calendar.dateComponents([.day], from: date1, to: date2)
+        let components = calendar.dateComponents(
+            [Calendar.Component.day],
+            from: date1,
+            to: date2
+        )
         let days = components.day ?? 0
         
         guard days > 0 else { return [date1] }
         
         var dates = [date1]
         for i in 1 ... days {
-            if let nextDate = calendar.date(byAdding: .day, value: i, to: date1) {
+            if let nextDate = calendar.date(
+                byAdding: Calendar.Component.day,
+                value: i,
+                to: date1
+            ) {
                 dates.append(nextDate)
             }
         }

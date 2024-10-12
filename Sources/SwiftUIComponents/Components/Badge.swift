@@ -23,7 +23,7 @@ public struct Badge: ViewModifier {
         ZStack(alignment: normalizedAlignment) {
             content
             Text(label)
-                .padding(.horizontal, 7)
+                .padding(Edge.Set.horizontal, 7)
                 .background(Capsule().fill(color))
                 .size(onChange: $badgeSize)
                 .if(normalizedAlignment == .topTrailing) { view in
