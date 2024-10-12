@@ -7,8 +7,7 @@ public struct DefaultWeekdaysHeaderView: View {
     var calendar: Calendar
     
     var weekRange: [Int] {
-        let firstWeekday = calendar.firstWeekday
-        
+        let firstWeekday: Int = calendar.firstWeekday
         var symbols = calendar.shortWeekdaySymbols
         symbols = Array(symbols[firstWeekday-1..<symbols.count]) + symbols[0..<firstWeekday-1]
         return symbols.compactMap({ calendar.shortWeekdaySymbols.firstIndex(of: $0) })

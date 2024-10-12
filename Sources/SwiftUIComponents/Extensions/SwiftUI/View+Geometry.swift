@@ -1,22 +1,22 @@
 import SwiftUI
 
-struct SizePreferenceKey: PreferenceKey {
-    static var defaultValue: CGSize = .zero
+public struct SizePreferenceKey: PreferenceKey {
+    public static var defaultValue: CGSize = .zero
     
-    static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
+    public static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
         value = nextValue()
     }
 }
 
-struct FramePreferenceKey: PreferenceKey {
-    static var defaultValue: CGRect = .zero
+public struct FramePreferenceKey: PreferenceKey {
+    public static var defaultValue: CGRect = .zero
     
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+    public static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
         value = nextValue()
     }
 }
 
-extension View {
+public extension View {
     func size(onChange: @escaping (CGSize) -> Void) -> some View {
         background(
             GeometryReader { proxy in

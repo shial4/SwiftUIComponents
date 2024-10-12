@@ -6,18 +6,12 @@ public struct SearchBar: View {
     }
     
     @Binding var text: String
-#if !SKIP
     @FocusState private var focusedField: FocusedField?
-#endif
     
     let prompt: String
 
     var isEditing: Bool {
-#if SKIP
-        return true
-#else
         focusedField == .search
-#endif
     }
     
     public init(text: Binding<String>, prompt: String = "Search...") {
@@ -52,9 +46,7 @@ public struct SearchBar: View {
                 }
             }
             .padding(Edge.Set.horizontal, 10)
-#if !SKIP
             .focused($focusedField, equals: FocusedField.search)
-#endif
         return result
             
     }

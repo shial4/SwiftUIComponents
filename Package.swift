@@ -4,27 +4,31 @@ import PackageDescription
 
 let package = Package(
     name: "SwiftUIComponents",
-    platforms: [
-        .macOS(.v13), .iOS(.v16)
-    ],
+    defaultLocalization: "en",
+    platforms: [.iOS(.v16), .macOS(.v13), .tvOS(.v16), .watchOS(.v9), .macCatalyst(.v16)],
     products: [
-        // Products define the executables and libraries a package produces, and make them visible to other packages.
         .library(
             name: "SwiftUIComponents",
             targets: ["SwiftUIComponents"]),
     ],
     dependencies: [
-        // Dependencies declare other packages that this package depends on.
-        // .package(url: /* package url */, from: "1.0.0"),
+        .package(url: "https://source.skip.tools/skip.git", from: "1.1.10"),
+        .package(url: "https://source.skip.tools/skip-ui.git", from: "1.11.2"),
+        .package(url: "https://source.skip.tools/skip-foundation.git", from: "1.0.0"),
     ],
     targets: [
-        // Targets are the basic building blocks of a package. A target can define a module or a test suite.
-        // Targets can depend on other targets in this package, and on products in packages this package depends on.
         .target(
             name: "SwiftUIComponents",
-            dependencies: []),
+            dependencies: [
+                .product(name: "SkipUI", package: "skip-ui"),
+                .product(name: "SkipFoundation", package: "skip-foundation"),
+            ],
+            plugins: [.plugin(name: "skipstone", package: "skip")]
+        ),
         .testTarget(
             name: "SwiftUIComponentsTests",
-            dependencies: ["SwiftUIComponents"]),
+            dependencies: ["SwiftUIComponents"],
+            plugins: [.plugin(name: "skipstone", package: "skip")]
+        ),
     ]
 )

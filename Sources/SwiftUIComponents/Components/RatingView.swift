@@ -20,13 +20,14 @@ public struct RatingView: View {
     public var body: some View {
         let result = ZStack {
             starsView(isFill: false)
-            starsView().mask {
-                GeometryReader { proxy in
-                    Rectangle()
-                        .fill(ForegroundStyle.foreground)
-                        .frame(width: proxy.size.width * progress, alignment: Alignment.leading)
+            starsView()
+                .mask {
+                    GeometryReader { proxy in
+                        Rectangle()
+                            .fill(ForegroundStyle.foreground)
+                            .frame(width: proxy.size.width * progress, alignment: Alignment.leading)
+                    }
                 }
-            }
         }
         return result
     }

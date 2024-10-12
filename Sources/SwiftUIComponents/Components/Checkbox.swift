@@ -4,8 +4,8 @@ import SwiftUI
 public struct Checkbox: View {
 #if !SKIP
     @Namespace private var animation
-    @Environment(\.isEnabled) private var isEnabled
 #endif
+    @Environment(\.isEnabled) private var isEnabled
     private var checked: Bool
     private var isFilled: Bool = true
     private let label: String?
@@ -43,7 +43,9 @@ public struct Checkbox: View {
                                                                lineJoin: CGLineJoin.round))
                             }
                             .opacity(isEnabled ? 1 : 0.4)
+#if !SKIP
                             .matchedGeometryEffect(id: "color", in: animation)
+#endif
                     } else {
                         RoundedRectangle(cornerRadius: proxy.size.height * 0.125)
                             .strokeBorder(ForegroundStyle.foreground, lineWidth: proxy.size.height * 0.125)
@@ -53,13 +55,17 @@ public struct Checkbox: View {
                                                        lineCap: CGLineCap.round, 
                                                        lineJoin: CGLineJoin.round))
                             .opacity(isEnabled ? 1 : 0.4)
+#if !SKIP
                             .matchedGeometryEffect(id: "color", in: animation)
+#endif
                     }
                 } else {
                     RoundedRectangle(cornerRadius: proxy.size.height * 0.125)
                         .strokeBorder(ForegroundStyle.foreground, lineWidth: proxy.size.height * 0.125)
                         .opacity(isEnabled ? 1 : 0.4)
+#if !SKIP
                         .matchedGeometryEffect(id: "color", in: animation)
+#endif
                 }
             }
             .aspectRatio(1, contentMode: ContentMode.fit)

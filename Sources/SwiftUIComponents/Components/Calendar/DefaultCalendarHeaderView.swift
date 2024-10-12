@@ -38,7 +38,7 @@ public struct DefaultCalendarHeaderView: View {
                 Chevron(thickness: 0.25)
                     .fill(colorSet.headerButtonColors)
                     .frame(width: 12, height: 18)
-                    .rotationEffect(Angle(degrees: 180), anchor: UnitPoint.center)
+                    .rotationEffect(Angle(degrees: 180))
                     .padding(8)
                     .contentShape(Rectangle())
             }

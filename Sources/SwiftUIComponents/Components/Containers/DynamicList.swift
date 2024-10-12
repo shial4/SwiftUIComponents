@@ -219,6 +219,7 @@ public struct DynamicList<Content: View>: View {
                 y: orientation == .vertical ? viewModel.scrollOffset : 0)
         .contentShape(Rectangle())
         .gesture(dragGesture(screenDimension: screenDimension))
+        #if !SKIP
         .onHover { inside in
             if inside {
                 onHover(size)
@@ -226,6 +227,7 @@ public struct DynamicList<Content: View>: View {
                 cleanUpMonitors()
             }
         }
+        #endif
     }
     
     private func cleanUpMonitors() {

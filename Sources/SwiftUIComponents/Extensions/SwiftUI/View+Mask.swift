@@ -7,12 +7,15 @@ public extension View {
         alignment: Alignment = .center,
         @ViewBuilder _ mask: () -> Mask
     ) -> some View {
-        self.mask {
-            Rectangle()
-                .overlay(alignment: alignment) {
-                    mask()
-                        .blendMode(BlendMode.destinationOut)
-                }
-        }
+        self
+#if !SKIP
+            .mask {
+                Rectangle()
+                    .overlay(alignment: alignment) {
+                        mask()
+                            .blendMode(BlendMode.destinationOut)
+                    }
+            }
+#endif
     }
 }

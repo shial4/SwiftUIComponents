@@ -4,16 +4,21 @@ public enum RectCorner : Sendable {
     case topLeft, topRight, bottomLeft, bottomRight, allCorners
 }
 
-extension View {
+public extension View {
     func cornerRadius(_ radius: Double, corners: RectCorner...) -> some View {
         clipShape(RoundedCorner(radius: radius, corners: Set(corners)))
     }
 }
 
 // Credits: https://stackoverflow.com/a/56763282
-struct RoundedCorner: Shape {
-    var radius: Double = .infinity
-    var corners: Set<RectCorner> = [.allCorners]
+public struct RoundedCorner: Shape {
+    public var radius: Double = .infinity
+    public var corners: Set<RectCorner> = [.allCorners]
+    
+    public init(radius: Double, corners: Set<RectCorner>) {
+        self.radius = radius
+        self.corners = corners
+    }
     
     private var tl: Double {
         corners.intersection([RectCorner.topLeft, RectCorner.allCorners]).isEmpty
@@ -32,7 +37,7 @@ struct RoundedCorner: Shape {
         ? 0 : radius
     }
         
-    func path(in rect: CGRect) -> Path {
+    public func path(in rect: CGRect) -> Path {
         var path = Path()
         
         let w = rect.size.width
