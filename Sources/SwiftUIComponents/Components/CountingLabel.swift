@@ -41,40 +41,39 @@ public struct CountingLabel: View {
     }
     
     public var body: some View {
-        let result = Text(text)
-            .onReceive(timer) { input in
-                guard text != to else {
-                    self.timer.upstream.connect().cancel()
-                    return
-                }
-                var fromString = to
-                var shouldInvalidate = true
-             
-                for i in 0..<numbersCount {
-                    guard let fromD = Double(fromValues[i]),
-                          let toD = Double(toValues[i]),
-                          let offset = Double(format?[i].components(separatedBy: CharacterSet(charactersIn: ".0123456789").inverted).joined() ?? "0"),
-                          counter.shouldContinue(fromD, to: toD, round: round, offset: offset) else { continue }
-                    let value = String(format: format?[i] ?? "%0.0f", counter.shift(fromD, to: toD, round: round, offset: offset))
-                    fromString = fromString.replacingOccurrences(of: toValues[i], with: value)
-                    shouldInvalidate = false
-                }
-                
-                if shouldInvalidate {
-                    withAnimation {
-                        text = to
-                    }
-                } else {
-                    withAnimation {
-                        text = fromString
-                    }
-                    round = round + 1
-                }
+        Text(text).onReceive(timer) { input in
+            guard text != to else {
+                self.timer.upstream.connect().cancel()
+                return
             }
-        return result
+            var fromString = to
+            var shouldInvalidate = true
+            
+            for i in 0..<numbersCount {
+                guard let fromD = Double(fromValues[i]),
+                      let toD = Double(toValues[i]),
+                      let offset = Double(format?[i].components(separatedBy: CharacterSet(charactersIn: ".0123456789").inverted).joined() ?? "0"),
+                      counter.shouldContinue(fromD, to: toD, round: round, offset: offset) else { continue }
+                let value = String(format: format?[i] ?? "%0.0f", counter.shift(fromD, to: toD, round: round, offset: offset))
+                fromString = fromString.replacingOccurrences(of: toValues[i], with: value)
+                shouldInvalidate = false
+            }
+            
+            if shouldInvalidate {
+                withAnimation {
+                    text = to
+                }
+            } else {
+                withAnimation {
+                    text = fromString
+                }
+                round = round + 1
+            }
+        }
     }
     
     // MARK: Helper Type
+    
     struct Counter {
         func numbers(_ text: String) -> [String] {
             do {

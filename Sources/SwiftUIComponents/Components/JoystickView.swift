@@ -12,7 +12,7 @@ public struct JoystickView: View {
     }
     
     public var body: some View {
-        let result = GeometryReader { proxy in
+        GeometryReader { proxy in
             Circle()
                 .strokeBorder(accetColor.opacity(0.4))
                 .background(Circle().fill(accetColor.opacity(0.2)))
@@ -28,7 +28,6 @@ public struct JoystickView: View {
                 )
                 .gesture(dragGesture(proxy))
         }
-        return result
     }
     
     private func dragGesture(_ proxy: GeometryProxy) -> some Gesture {

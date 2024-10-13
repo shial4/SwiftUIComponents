@@ -65,7 +65,7 @@ public struct DynamicList<Content: View>: View {
     }
     
     public var body: some View {
-        let result = GeometryReader { geometry in
+        GeometryReader { geometry in
             listView(geometry.size)
                 .onChange(of: scrollOffset) { value in
                     guard scrollOffset != viewModel.scrollOffset else { return }
@@ -88,7 +88,6 @@ public struct DynamicList<Content: View>: View {
                     }
                 }
         }
-        return result
     }
     
     private var previousScrollOffset: Double {
@@ -219,7 +218,6 @@ public struct DynamicList<Content: View>: View {
                 y: orientation == .vertical ? viewModel.scrollOffset : 0)
         .contentShape(Rectangle())
         .gesture(dragGesture(screenDimension: screenDimension))
-        #if !SKIP
         .onHover { inside in
             if inside {
                 onHover(size)
@@ -227,7 +225,6 @@ public struct DynamicList<Content: View>: View {
                 cleanUpMonitors()
             }
         }
-        #endif
     }
     
     private func cleanUpMonitors() {
@@ -287,18 +284,15 @@ public struct StackView<Content: View>: View {
     }
     
     public var body: some View {
-        let result = Group {
-            if orientation == .horizontal {
-                HStack(spacing: 0) {
-                    content
-                }
-            } else {
-                VStack(spacing: 0) {
-                    content
-                }
+        if orientation == .horizontal {
+            HStack(spacing: 0) {
+                content
+            }
+        } else {
+            VStack(spacing: 0) {
+                content
             }
         }
-        return result
     }
 }
 

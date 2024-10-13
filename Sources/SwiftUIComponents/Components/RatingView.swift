@@ -18,7 +18,7 @@ public struct RatingView: View {
     }
     
     public var body: some View {
-        let result = ZStack {
+        ZStack {
             starsView(isFill: false)
             starsView()
                 .mask {
@@ -29,7 +29,6 @@ public struct RatingView: View {
                     }
                 }
         }
-        return result
     }
     
     private func starsView(isFill: Bool = true) -> some View {

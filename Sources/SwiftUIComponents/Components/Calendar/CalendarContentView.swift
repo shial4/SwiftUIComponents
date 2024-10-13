@@ -56,7 +56,7 @@ public struct CalendarContentView<Day>: View where Day: View {
     }
     
     public var body: some View {
-        let result = Group {
+        Group {
             switch type {
             case .yearly(let columns):
                 yearly(previewDate, columns: columns)
@@ -67,7 +67,6 @@ public struct CalendarContentView<Day>: View where Day: View {
             }
         }
         .coordinateSpace(name: "calendar.coordinate.space")
-        return result
     }
     
     private var weekly: some View {

@@ -2,7 +2,6 @@ import Foundation
 import SwiftUI
 import Combine
 
-#if !SKIP
 @propertyWrapper
 public struct CodableAppStorage<Value: Codable>: DynamicProperty {
     @StateObject private var valuePublisher: ValuePublisher<Value>
@@ -56,4 +55,3 @@ public extension UserDefaults {
         return nil
     }
 }
-#endif

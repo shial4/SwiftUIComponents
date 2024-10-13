@@ -54,16 +54,9 @@ public struct FrameModifier: ViewModifier {
     }
     
     public func body(content: Content) -> some View {
-#if SKIP
-        content
-            .rotationEffect(rotation)
-            .offset(x: offset.width, y: offset.height)
-            .scaleEffect(scale)
-#else
         content
             .rotationEffect(rotation, anchor: anchor)
             .offset(x: offset.width, y: offset.height)
             .scaleEffect(scale, anchor: anchor)
-#endif
     }
 }

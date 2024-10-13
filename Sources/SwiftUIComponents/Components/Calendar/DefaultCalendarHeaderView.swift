@@ -33,7 +33,7 @@ public struct DefaultCalendarHeaderView: View {
     }
     
     public var body: some View {
-        let result = HStack {
+        HStack {
             Button(action: previousTimePeriod) {
                 Chevron(thickness: 0.25)
                     .fill(colorSet.headerButtonColors)
@@ -62,7 +62,6 @@ public struct DefaultCalendarHeaderView: View {
             }
             .buttonStyle(PlainButtonStyle())
         }
-        return result
     }
     
     // MARK: Button Actions

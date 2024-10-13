@@ -23,14 +23,13 @@ public struct DefaultWeekdaysHeaderView: View {
     }
     
     public var body: some View {
-        let result = HStack {
+        HStack {
             ForEach(weekRange, id: \.self) { index in
                 Text(calendar.shortWeekdaySymbols[index])
                     .foregroundColor(headerTextColor)
                     .frame(maxWidth: Double.infinity)
             }
         }
-        return result
     }
 }
 

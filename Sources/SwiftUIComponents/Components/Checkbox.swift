@@ -2,9 +2,7 @@ import SwiftUI
 
 /// A checkbox view with optional label.
 public struct Checkbox: View {
-#if !SKIP
     @Namespace private var animation
-#endif
     @Environment(\.isEnabled) private var isEnabled
     private var checked: Bool
     private var isFilled: Bool = true
@@ -29,7 +27,7 @@ public struct Checkbox: View {
     }
     
     public var body: some View {
-        let result = HStack {
+        HStack {
             GeometryReader { proxy in
                 if checked {
                     if isFilled {
@@ -43,9 +41,7 @@ public struct Checkbox: View {
                                                                lineJoin: CGLineJoin.round))
                             }
                             .opacity(isEnabled ? 1 : 0.4)
-#if !SKIP
                             .matchedGeometryEffect(id: "color", in: animation)
-#endif
                     } else {
                         RoundedRectangle(cornerRadius: proxy.size.height * 0.125)
                             .strokeBorder(ForegroundStyle.foreground, lineWidth: proxy.size.height * 0.125)
@@ -55,17 +51,13 @@ public struct Checkbox: View {
                                                        lineCap: CGLineCap.round, 
                                                        lineJoin: CGLineJoin.round))
                             .opacity(isEnabled ? 1 : 0.4)
-#if !SKIP
                             .matchedGeometryEffect(id: "color", in: animation)
-#endif
                     }
                 } else {
                     RoundedRectangle(cornerRadius: proxy.size.height * 0.125)
                         .strokeBorder(ForegroundStyle.foreground, lineWidth: proxy.size.height * 0.125)
                         .opacity(isEnabled ? 1 : 0.4)
-#if !SKIP
                         .matchedGeometryEffect(id: "color", in: animation)
-#endif
                 }
             }
             .aspectRatio(1, contentMode: ContentMode.fit)
@@ -77,7 +69,6 @@ public struct Checkbox: View {
                     .opacity(isEnabled ? 1 : 0.4)
             }
         }
-        return result
     }
 }
 

@@ -1,4 +1,3 @@
-#if !SKIP
 import SwiftUI
 
 extension AnyTransition {
@@ -23,4 +22,3 @@ extension AnyTransition {
         return .modifier(active: active, identity: identity)
     }
 }
-#endif

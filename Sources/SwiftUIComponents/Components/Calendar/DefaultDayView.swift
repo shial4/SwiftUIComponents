@@ -49,7 +49,7 @@ public struct DefaultDayView: View {
     }
     
     public var body: some View {
-        let result = GeometryReader { proxy in
+        GeometryReader { proxy in
             dayTextView
                 .padding(4)
                 .if(contentColor != nil) { content in
@@ -81,21 +81,13 @@ public struct DefaultDayView: View {
                 }
                 .frame(minWidth: 44, minHeight: 44)
                 .if(proxy.size.height < 44 || proxy.size.width < 44) { content in
-#if SKIP
-                    content.scaleEffect(
-                        x: proxy.size.width != 0 ? proxy.size.width / 44 : 1,
-                        y: proxy.size.height != 0 ? proxy.size.height / 44 : 1
-                    )
-#else
                     content.scaleEffect(
                         x: proxy.size.width != 0 ? proxy.size.width / 44 : 1,
                         y: proxy.size.height != 0 ? proxy.size.height / 44 : 1,
                         anchor: UnitPoint.topLeading
                     )
-#endif
                 }
         }
-        return result
     }
     
     var dayTextView: some View {

@@ -64,14 +64,13 @@ public struct Progress<Content: Shape>: View {
     }
     
     public var body: some View {
-        let result = ZStack {
+        ZStack {
             content
                 .stroke(BackgroundStyle.background, style: style)
             content
                 .trim(from: 0, to: Double(progress))
                 .stroke(ForegroundStyle.foreground, style: style)
         }
-        return result
     }
 }
 

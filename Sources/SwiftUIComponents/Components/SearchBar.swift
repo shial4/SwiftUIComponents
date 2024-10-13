@@ -20,7 +20,7 @@ public struct SearchBar: View {
     }
     
     public var body: some View {
-        let result = TextField(prompt, text: $text)
+        TextField(prompt, text: $text)
             .padding(8)
             .padding(Edge.Set.leading, 8)
             .padding(Edge.Set.trailing, 34)
@@ -47,8 +47,6 @@ public struct SearchBar: View {
             }
             .padding(Edge.Set.horizontal, 10)
             .focused($focusedField, equals: FocusedField.search)
-        return result
-            
     }
 }
 
