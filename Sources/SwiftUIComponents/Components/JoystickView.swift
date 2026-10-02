@@ -1,113 +1,70 @@
 import SwiftUI
 
+/// A spring-return joystick. The binding reports the raw drag translation in points;
+/// the visible grip is constrained to the control's circular travel area.
 public struct JoystickView: View {
     @Binding public var translation: CGPoint
-    @State private var dragPosition: CGPoint? = nil
-    
-    private var gripColor: Color = Color.white
-    private var accetColor: Color = Color.black
-    
-    public init(translation: Binding<CGPoint>) {
-        self._translation = translation
-    }
-    
+    private var gripColor: Color = .white
+    private var controlColor: Color = .black
+
+    public init(translation: Binding<CGPoint>) { self._translation = translation }
+
     public var body: some View {
         GeometryReader { proxy in
+            let diameter = min(proxy.size.width, proxy.size.height)
+            let grip = Self.constrained(translation, radius: diameter / 4)
             Circle()
-                .strokeBorder(accetColor.opacity(0.4))
-                .background(Circle().fill(accetColor.opacity(0.2)))
-                .overlay(
-                    Circle()
-                        .strokeBorder(accetColor)
-                        .background(Circle().fill(gripColor))
-                        .scaleEffect(0.5)
-                        .position(dragPosition ?? CGPoint(
-                            x: proxy.frame(in: CoordinateSpace.local).midX,
-                            y: proxy.frame(in: CoordinateSpace.local).midY
-                        ))
-                )
-                .gesture(dragGesture(proxy))
+                .stroke(controlColor.opacity(0.4), lineWidth: 1)
+                .background(Circle().fill(controlColor.opacity(0.2)))
+                .overlay {
+                    Circle().fill(gripColor)
+                        .overlay(Circle().stroke(controlColor, lineWidth: 1))
+                        .frame(width: diameter / 2, height: diameter / 2)
+                        .offset(x: grip.x, y: grip.y)
+                }
+                .componentHitArea(Circle())
+                #if os(tvOS)
+                .focusable()
+                .onMoveCommand { direction in
+                    switch direction {
+                    case .left: translation.x -= 10
+                    case .right: translation.x += 10
+                    case .up: translation.y -= 10
+                    case .down: translation.y += 10
+                    @unknown default: break
+                    }
+                }
+                .onExitCommand { translation = .zero }
+                #else
+                .gesture(DragGesture()
+                    .onChanged { translation = CGPoint(x: $0.translation.width, y: $0.translation.height) }
+                    .onEnded { _ in translation = .zero })
+                #endif
         }
+        .aspectRatio(1, contentMode: .fit)
+        .accessibilityLabel("Joystick")
+        .accessibilityValue("Horizontal \(translation.x), vertical \(translation.y)")
     }
-    
-    private func dragGesture(_ proxy: GeometryProxy) -> some Gesture {
-        DragGesture(coordinateSpace: CoordinateSpace.local)
-        .onChanged { value in
-            let center = CGPoint(
-                x: proxy.frame(in: CoordinateSpace.local).midX,
-                y: proxy.frame(in: CoordinateSpace.local).midY
-            )
-            let location = CGPoint(x: center.x + value.translation.width, y: center.y + value.translation.height)
-            let radius = min(proxy.size.width, proxy.size.height) / 4
-            if let intersection = lineCircleIntersection(
-                line: LWLine(start: center, end: location),
-                circle: LWCircle(center: center, radius: radius)
-            ).first {
-                dragPosition = intersection
-            } else {
-                dragPosition = location
-            }
-            let translation = CGPoint(
-                x: location.x - center.x,
-                y: location.y - center.y
-            )
-            self.translation = translation
-        }.onEnded { value in
-            dragPosition = nil
-            translation = .zero
-        }
-    }
-    
-    typealias LWLine = (start: CGPoint, end: CGPoint)
-    typealias LWCircle = (center: CGPoint, radius: CGFloat)
-    func lineCircleIntersection(line: LWLine, circle: LWCircle, isSegment: Bool = true) -> [CGPoint] {
-        var result: [CGPoint] = []
-        let angle = atan2(line.end.y - line.start.y, line.end.x - line.start.x)
-        var at = CGAffineTransform(rotationAngle: angle)
-            .inverted()
-            .translatedBy(x: -circle.center.x, y: -circle.center.y)
-        let p1 = line.start.applying(at)
-        let p2 = line.end.applying(at)
-        let minX = min(p1.x, p2.x), maxX = max(p1.x, p2.x)
-        let y = p1.y
-        at = at.inverted()
-        
-        func addPoint(x: CGFloat, y: CGFloat) {
-            if !isSegment || (x <= maxX && x >= minX) {
-                result.append(CGPoint(x: x, y: y).applying(at))
-            }
-        }
-        
-        if y == circle.radius || y == -circle.radius {
-            addPoint(x: 0, y: y)
-        } else if y < circle.radius && y > -circle.radius {
-            let x = (circle.radius * circle.radius - y * y).squareRoot()
-            addPoint(x: -x, y: y)
-            addPoint(x: x, y: y)
-        }
-        return result
-    }
-}
 
-// MARK: - View Modifiers
-public extension JoystickView {
-    func gripColor(_ color: Color) -> Self {
+    static func constrained(_ point: CGPoint, radius: Double) -> CGPoint {
+        guard point.x.isFinite, point.y.isFinite, radius.isFinite, radius > 0 else { return .zero }
+        let distance = hypot(point.x, point.y)
+        guard distance > radius else { return point }
+        return CGPoint(x: point.x / distance * radius, y: point.y / distance * radius)
+    }
+
+    public func gripColor(_ color: Color) -> Self {
         var view = self
         view.gripColor = color
         return view
     }
-    
-    func accetColor(_ color: Color) -> Self {
+
+    public func accentColor(_ color: Color) -> Self {
         var view = self
-        view.accetColor = color
+        view.controlColor = color
         return view
     }
-}
 
-// MARK: - Previews
-struct JoystickView_Previews: PreviewProvider {
-    static var previews: some View {
-        JoystickView(translation: .constant(.zero))
-            .frame(width: 180, height: 180)
-    }
+    @available(*, deprecated, renamed: "accentColor(_:)")
+    public func accetColor(_ color: Color) -> Self { accentColor(color) }
 }

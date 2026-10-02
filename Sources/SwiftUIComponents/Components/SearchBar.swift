@@ -1,55 +1,34 @@
 import SwiftUI
 
+/// An inline search field with a clear-and-dismiss button while focused.
 public struct SearchBar: View {
-    enum FocusedField {
-        case search
-    }
-    
-    @Binding var text: String
-    @FocusState private var focusedField: FocusedField?
-    
-    let prompt: String
+    @Binding private var text: String
+    @FocusState var isFocused: Bool
+    private let prompt: String
 
-    var isEditing: Bool {
-        focusedField == .search
-    }
-    
     public init(text: Binding<String>, prompt: String = "Search...") {
         self._text = text
         self.prompt = prompt
     }
-    
+
     public var body: some View {
         TextField(prompt, text: $text)
-            .padding(8)
-            .padding(Edge.Set.leading, 8)
-            .padding(Edge.Set.trailing, 34)
-            .background(Color.gray)
-            .cornerRadius(8)
-            .overlay(alignment: Alignment.trailing) {
-                if isEditing {
-                    Button(action: {
-                        withAnimation {
-                            self.text = ""
-                            self.focusedField = nil
-                        }
-                    }) {
-                        XMark()
-                            .stroke(Color.black)
-                            .padding(8)
-                            .frame(width: 28, height: 28)
-                            .background(Color.white)
-                            .clipShape(Circle())
+            .textFieldStyle(.plain)
+            .focused($isFocused)
+            .padding(10)
+            .padding(.trailing, isFocused ? 28 : 0)
+            .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+            .overlay(alignment: .trailing) {
+                if isFocused {
+                    Button("Clear search", systemImage: "xmark") {
+                        text = ""
+                        isFocused = false
                     }
-                    .padding(Edge.Set.trailing, 10)
-                    .transition(AnyTransition.move(edge: Edge.trailing))
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.plain)
+                    .padding(.trailing, 10)
                 }
             }
-            .padding(Edge.Set.horizontal, 10)
-            .focused($focusedField, equals: FocusedField.search)
+            .accessibilityLabel(Text(prompt))
     }
-}
-
-#Preview {
-    SearchBar(text: .constant(""))
 }

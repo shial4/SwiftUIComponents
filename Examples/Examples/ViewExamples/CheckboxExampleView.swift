@@ -2,33 +2,19 @@ import SwiftUI
 import SwiftUIComponents
 
 struct CheckboxExampleView: View {
-    @State var isChecked = true
-    
+    @State var checked = true
     var body: some View {
-        NavigationView {
-            VStack(alignment: .leading) {
-                Checkbox(checked: isChecked)
-                    .stroked()
-                    .frame(height: 32)
-                    .onTapGesture { isChecked.toggle() }
-                Checkbox(label: isChecked ? "checked" : "unchecked", checked: isChecked)
-                    .frame(height: 32)
-                    .onTapGesture { withAnimation(.linear) { 
-                        isChecked.toggle()
-                    } }
-            }.frame(
-                minWidth: 0,
-                maxWidth: .infinity,
-                minHeight: 0,
-                maxHeight: .infinity,
-                alignment: .topLeading
-            ).padding()
+        Form {
+            Section("Interactive: shared binding") {
+                Checkbox(label: "Filled checkbox", checked: $checked).frame(height: 32).foregroundStyle(.blue)
+                Checkbox(label: "Outlined checkbox", checked: $checked).stroked().frame(height: 32).foregroundStyle(.orange)
+                Text(checked ? "Checked" : "Unchecked")
+            }
+            Section("Read-only and disabled variants") {
+                Checkbox(checked: checked).frame(width: 32, height: 32)
+                Checkbox(label: "Disabled", checked: $checked).disabled(true).frame(height: 32)
+                Checkbox(label: "Unchecked indicator", checked: false).frame(height: 32)
+            }
         }
-    }
-}
-
-struct CheckboxExampleView_Previews: PreviewProvider {
-    static var previews: some View {
-        CheckboxExampleView()
     }
 }

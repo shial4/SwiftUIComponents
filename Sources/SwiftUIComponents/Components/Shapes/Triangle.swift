@@ -1,13 +1,16 @@
 import SwiftUI
 
-struct Triangle: Shape {
-    enum Orientation {
+public struct Triangle: Shape {
+    public enum Orientation: Sendable {
         case leading, trailing, top, bottom
     }
 
-    let orientation: Orientation
+    public let orientation: Orientation
+    public init(orientation: Orientation = .top) {
+        self.orientation = orientation
+    }
 
-    func path(in rect: CGRect) -> Path {
+    public func path(in rect: CGRect) -> Path {
         var path = Path()
         if orientation == .leading {
             path.move(to: CGPoint(x: rect.maxX, y: rect.minY))

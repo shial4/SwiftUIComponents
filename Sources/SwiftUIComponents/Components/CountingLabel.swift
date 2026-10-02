@@ -1,112 +1,119 @@
 import SwiftUI
-import Combine
 
+/// Counts the numbers embedded in a string. Animation cancels when the view disappears
+/// and restarts when its inputs change. At most 120 frames are produced per change.
 public struct CountingLabel: View {
-    @State private var text: String = ""
-    @State private var round: Double = 1
-    private let timer: Publishers.Autoconnect<Timer.TimerPublisher>
-    private let counter: Counter = Counter()
-    private let from: String
-    private let to: String
-    private let format: [String]?
-    private let fromValues: [String]
-    private let toValues: [String]
-    private let numbersCount: Int
-    
+    @State var text: String
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
+    private let counter: CountingText
+    private let interval: TimeInterval
+
     public init(from: String? = nil, to: String, interval: TimeInterval = 0.2, format: [String]? = nil) {
-        let toValues = counter.numbers(to)
-        let numbersCount = toValues.count < toValues.count ? toValues.count : toValues.count
-        
-        var fromText = from ?? to
-        if from == nil {
-            for i in 0..<numbersCount {
-                fromText = fromText.replacingOccurrences(of: toValues[i], with: String(format: format?[i] ?? "%0.0f", 0))
-            }
-        }
-        let fromValues = counter.numbers(fromText)
-        
-        self.to = to
-        self.from = fromText
-        self.text = fromText
-        self.format = format
-        self.fromValues = fromValues
-        self.toValues = toValues
-        self.numbersCount = numbersCount
-        self.timer = Timer.publish(every: interval, on: RunLoop.main, in: RunLoop.Mode.common).autoconnect()
-        
-        guard numbersCount > 0 else {
-            self.text = to
-            return
-        }
+        let counter = CountingText(from: from, to: to, formats: format ?? [])
+        self.counter = counter
+        self.interval = interval.isFinite ? max(0.001, min(interval, 60)) : 0.2
+        self._text = State(initialValue: counter.initialText)
     }
-    
+
     public var body: some View {
-        Text(text).onReceive(timer) { input in
-            guard text != to else {
-                self.timer.upstream.connect().cancel()
-                return
-            }
-            var fromString = to
-            var shouldInvalidate = true
-            
-            for i in 0..<numbersCount {
-                guard let fromD = Double(fromValues[i]),
-                      let toD = Double(toValues[i]),
-                      let offset = Double(format?[i].components(separatedBy: CharacterSet(charactersIn: ".0123456789").inverted).joined() ?? "0"),
-                      counter.shouldContinue(fromD, to: toD, round: round, offset: offset) else { continue }
-                let value = String(format: format?[i] ?? "%0.0f", counter.shift(fromD, to: toD, round: round, offset: offset))
-                fromString = fromString.replacingOccurrences(of: toValues[i], with: value)
-                shouldInvalidate = false
-            }
-            
-            if shouldInvalidate {
-                withAnimation {
-                    text = to
+        Text(text)
+            .task(id: AnimationInput(counter: counter, interval: interval, reduceMotion: reduceMotion)) {
+                text = reduceMotion ? counter.target : counter.initialText
+                guard !reduceMotion, counter.initialText != counter.target else { return }
+                for frame in 1...counter.frameCount {
+                    do { try await Task.sleep(for: .seconds(interval)) }
+                    catch { return }
+                    guard !Task.isCancelled else { return }
+                    text = counter.text(at: frame)
                 }
-            } else {
-                withAnimation {
-                    text = fromString
-                }
-                round = round + 1
             }
-        }
     }
-    
-    // MARK: Helper Type
-    
-    struct Counter {
-        func numbers(_ text: String) -> [String] {
-            do {
-                let regex = try NSRegularExpression(pattern: "[\\-\\+]?[0-9]*(\\.[0-9]+)?")
-                let nsString = text as NSString
-                let results = regex.matches(in: text, range: NSRange(location: 0, length: nsString.length))
-                return results.map { nsString.substring(with: $0.range)}.filter({ !$0.isEmpty })
-            } catch {
-                return []
-            }
-        }
-        fileprivate func shouldContinue(_ from: Double, to: Double, round: Double, offset: Double = 0) -> Bool {
-            if to - from < 0 {
-                return shift(from, to: to, round: round, offset: offset) > to
-            } else {
-                return shift(from, to: to, round: round, offset: offset) < to
-            }
-        }
-        
-        fileprivate func shift(_ from: Double, to: Double, round: Double, offset: Double = 0) -> Double {
-            if to - from < 0 {
-                return (from - (1 * pow(10.0, offset)) * round)
-            } else {
-                return (from + (1 * pow(10.0, offset)) * round)
-            }
-        }
+
+    private struct AnimationInput: Equatable {
+        let counter: CountingText
+        let interval: TimeInterval
+        let reduceMotion: Bool
     }
 }
 
-#Preview {
-    VStack {
-        CountingLabel(to: "11 and second number in same string -22.0")
-        CountingLabel(from: "down 11.0 up 7", to: "down 5.0 up 11", interval: 0.2)
-        CountingLabel(from: "down 11.0 up 7", to: "down 5.0 up 11", format: ["%0.2f", "%0.0f"])
+struct CountingText: Equatable, Sendable {
+    private struct Number: Equatable, Sendable {
+        let range: NSRange
+        let from: Double
+        let to: Double
+        let format: String
+        let step: Double
+    }
+
+    private static let numberExpression = try? NSRegularExpression(pattern: #"[+-]?(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)"#)
+    private static let formatExpression = try? NSRegularExpression(pattern: #"^%([0-9]*)(?:\.([0-9]{1,2}))?[fFeEgG]$"#)
+    private let numbers: [Number]
+    let initialText: String
+    let target: String
+    let frameCount: Int
+
+    init(from: String?, to: String, formats: [String] = []) {
+        self.target = to
+        let targets = Self.matches(in: to)
+        let sources = from.map(Self.matches)
+        let sourceText = from ?? to
+        let sourceNSString = sourceText as NSString
+        let targetNSString = to as NSString
+        var numbers: [Number] = []
+        if sources == nil || sources?.count == targets.count {
+            for (index, range) in targets.enumerated() {
+                guard let target = Double(targetNSString.substring(with: range)), target.isFinite else { continue }
+                let source = sources.flatMap { Double(sourceNSString.substring(with: $0[index])) } ?? 0
+                guard source.isFinite else { continue }
+                let requestedFormat = index < formats.count ? formats[index] : "%0.0f"
+                let (format, precision) = Self.validatedFormat(requestedFormat)
+                numbers.append(Number(range: range, from: source, to: target, format: format, step: pow(10, -Double(precision))))
+            }
+        }
+        self.numbers = numbers
+        let steps = numbers.map { abs($0.to - $0.from) / $0.step }.max() ?? 0
+        self.frameCount = Int(min(120, max(1, ceil(steps))))
+        if numbers.isEmpty {
+            self.initialText = to
+        } else if let from {
+            self.initialText = from
+        } else {
+            self.initialText = Self.replacing(in: to, numbers: numbers) { String(format: $0.format, 0.0) }
+        }
+    }
+
+    func text(at frame: Int) -> String {
+        guard frame > 0 else { return initialText }
+        guard frame < frameCount else { return target }
+        return Self.replacing(in: target, numbers: numbers) { number in
+            let distance = number.to - number.from
+            let step = max(number.step, abs(distance) / Double(frameCount)) * Double(frame)
+            let fraction = Double(frame) / Double(frameCount)
+            let value = distance.isFinite
+                ? number.from + (distance < 0 ? -1 : 1) * min(abs(distance), step)
+                : number.from * (1 - fraction) + number.to * fraction
+            return String(format: number.format, value)
+        }
+    }
+
+    private static func matches(in text: String) -> [NSRange] {
+        numberExpression?.matches(in: text, range: NSRange(text.startIndex..., in: text)).map(\.range) ?? []
+    }
+
+    private static func validatedFormat(_ format: String) -> (String, Int) {
+        guard let match = formatExpression?.firstMatch(in: format, range: NSRange(format.startIndex..., in: format)) else {
+            return ("%0.0f", 0)
+        }
+        let string = format as NSString
+        let width = Int(string.substring(with: match.range(at: 1))) ?? 0
+        let precision = match.range(at: 2).location == NSNotFound ? 0 : Int(string.substring(with: match.range(at: 2))) ?? 0
+        guard width <= 32, precision <= 12 else { return ("%0.0f", 0) }
+        return (format, precision)
+    }
+
+    private static func replacing(in text: String, numbers: [Number], value: (Number) -> String) -> String {
+        let result = NSMutableString(string: text)
+        for number in numbers.reversed() { result.replaceCharacters(in: number.range, with: value(number)) }
+        return result as String
     }
 }

@@ -1,271 +1,166 @@
 import SwiftUI
 
-/// A view that displays the content of a calendar based on the specified `CalendarType`.
-public struct CalendarContentView<Day>: View where Day: View {
-    @Binding var selection: ClosedRange<Date>?
-    @State private var hoverPoint: CGPoint? = nil
-    private var isMultiselectionEnabled: Bool = true
-    private var isSelectionEnabled: Bool = true
-    
-    var type: CalendarType
-    var previewDate: Date
-    var calendar: Calendar
-    
-    @ViewBuilder var dayView: (_ date: Date, _ calendar: Calendar, _ isDateInMonth: Bool, _ isSelected: DaySelection?) -> Day
-    
-    private var formatterMonth: DateFormatter {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMMM"
-        formatter.locale = calendar.locale
-        return formatter
+/// A calendar grid that supports individual selection, range selection and drag extension.
+public struct CalendarContentView<Day: View>: View {
+    @Binding private var selection: TimeRange?
+    @State var width: Double = 0
+    @State var rowFrames: [CalendarRowID: CGRect] = [:]
+    private var isMultiselectionEnabled = true
+    private var isSelectionEnabled = true
+    private let type: CalendarType
+    private let previewDate: Date
+    private let calendar: Calendar
+    private let dayView: (Date, Calendar, Bool, DaySelection?) -> Day
+    private let monthSpacing: Double = 8
+    private var yearColumns: Int {
+        if case .yearly(let requested) = type { return min(12, max(1, requested)) }
+        return 1
     }
-    
-    private var numberOfWeekdays: Int {
-        return calendar.shortWeekdaySymbols.count
-    }
-    
-    private var numberOfMonths: Int {
-        guard let range = calendar.range(of: Calendar.Component.month, in: Calendar.Component.year, for: previewDate) else {
-            return 0
-        }
-        return range.count
-    }
-    
-    private var isSwipeGestureEnabled: Bool {
-        isMultiselectionEnabled && isSelectionEnabled
-    }
-    
-    /// Initializes a calendar content view with the specified parameters.
-    ///
-    /// - Parameters:
-    ///   - type: The type of calendar view to display.
-    ///   - selection: A binding to the selected date range.
-    ///   - previewDate: The date to preview.
-    ///   - calendar: The calendar to use for the view.
-    ///   - dayView: A closure that returns the day view for the calendar content view.
-    public init(type: CalendarType = .monthly,
-                selection: Binding<ClosedRange<Date>?>,
-                previewDate: Date,
-                calendar: Calendar,
-                dayView: @escaping (_ date: Date, _ calendar: Calendar, _ isDateInMonth: Bool, _ isSelected: DaySelection?) -> Day) {
+
+    public init(type: CalendarType = .monthly, selection: Binding<TimeRange?>,
+                previewDate: Date, calendar: Calendar,
+                @ViewBuilder dayView: @escaping (Date, Calendar, Bool, DaySelection?) -> Day) {
         self.type = type
         self._selection = selection
         self.previewDate = previewDate
         self.calendar = calendar
         self.dayView = dayView
     }
-    
-    public var body: some View {
-        Group {
-            switch type {
-            case .yearly(let columns):
-                yearly(previewDate, columns: columns)
-            case .monthly:
-                monthly(previewDate)
-            case .weekly:
-                weekly
-            }
-        }
-        .coordinateSpace(name: "calendar.coordinate.space")
-    }
-    
-    private var weekly: some View {
-        HStack(spacing: 0) {
-            ForEach(1...7, id: \.self) { dayIndex in
-                let date = date(for: dayIndex, in: 1, of: previewDate)
-                dayView(date, calendar, true, selection(for: date))
 
-                    .background( GeometryReader { proxy in
-                        Rectangle()
-                            .foregroundColor(Color.clear)
-                            .onChange(of: hoverPoint, perform: { newValue in
-                                if let value = newValue, proxy.frame(in: CoordinateSpace.named("calendar.coordinate.space")).contains(value) {
-                                    updateSelectionIfNeeded(date)
-                                }
-                            })
-                    })
-                    .contentShape(Rectangle())
-                    .gesture(isSelectionEnabled ? onDayTap(date) : nil)
+    public var body: some View {
+        let periods = displayedPeriods
+        return content(periods: periods)
+            .onGeometryChange(for: Double.self, of: { $0.size.width }) { width = $0 }
+    }
+
+    private var displayedPeriods: [CalendarPeriod] {
+        let grid = CalendarGrid(calendar: calendar)
+        switch type {
+        case .weekly:
+            let dates = grid.week(containing: previewDate)
+            return [CalendarPeriod(month: previewDate, dates: dates)]
+        case .monthly:
+            let month = calendar.dateInterval(of: .month, for: previewDate)?.start ?? previewDate
+            return [CalendarPeriod(month: month, dates: grid.month(containing: month))]
+        case .yearly:
+            return grid.months(inYearContaining: previewDate).map {
+                CalendarPeriod(month: $0, dates: grid.month(containing: $0))
             }
         }
-        .gesture(isSwipeGestureEnabled ? onSwipe() : nil)
     }
-    
-    private func monthly(_ previewDate: Date) -> some View {
-        let weeksCount = numberOfWeeks(of: previewDate)
-        let remainingSpacers: Int = 6 - weeksCount
-        return VStack(spacing: 0) {
-            ForEach(0..<weeksCount, id: \.self) { weekIndex in
-                HStack(spacing: 0) {
-                    ForEach(1..<numberOfWeekdays + 1, id: \.self) { dayIndex in
-                        let date = date(for: dayIndex, in: weekIndex, of: previewDate)
-                        dayView(date, calendar, previewDate.month(calendar) == date.month(calendar), selection(for: date))
-                            .background( GeometryReader { proxy in
-                                Rectangle()
-                                    .foregroundColor(Color.clear)
-                                    .onChange(of: hoverPoint, perform: { newValue in
-                                        if let value = newValue, proxy.frame(in: CoordinateSpace.named("calendar.coordinate.space")).contains(value) {
-                                            updateSelectionIfNeeded(date)
-                                        }
-                                    })
-                            })
-                            .contentShape(Rectangle())
-                            .gesture(isSelectionEnabled ? onDayTap(date) : nil)
-                    }
-                }
-            }
-            if remainingSpacers > 0 {
-                ForEach(0..<remainingSpacers, id: \.self) { _ in
-                    Spacer()
-                        .frame(maxWidth: Double.infinity)
-                }
-            }
-        }
-        .gesture(isSwipeGestureEnabled ? onSwipe() : nil)
-    }
-    
-    private func yearly(_ previewDate: Date, columns: Int) -> some View {
-        VStack(alignment: HorizontalAlignment.leading, spacing: 0) {
-            ForEach(0..<(numberOfMonths / columns), id: \.self) { rowIndex in
-                HStack(alignment: VerticalAlignment.top, spacing: 0) {
-                    ForEach(0..<columns, id: \.self) { columnIndex in
-                        let month = rowIndex * columns + columnIndex + 1
-                        let date = previewDate.shiftToMonth(month, calendar: calendar)
-                        VStack(spacing: 0) {
-                            Text(date, formatter: formatterMonth)
-                                .lineLimit(1)
-                            monthly(date)
-                                .padding(Edge.Set.vertical, 8)
-                                .padding(Edge.Set.horizontal, columns > 1 ? 8 : 0)
+
+    @ViewBuilder private func content(periods: [CalendarPeriod]) -> some View {
+        let monthWidth = max(0, (width - Double(yearColumns - 1) * monthSpacing) / Double(yearColumns))
+        let side = width > 0 ? monthWidth / Double(calendar.weekdaySymbols.count) : nil
+        switch type {
+        case .weekly, .monthly:
+            if let period = periods.first { grid(period, side: side, periods: periods) }
+        case .yearly:
+            let rows = (periods.count + yearColumns - 1) / yearColumns
+            let monthLength: CGFloat? = width > 0 ? CGFloat(monthWidth) : nil
+            // A year is bounded to its calendar's months. Stacks allow the containing page to scroll.
+            VStack(alignment: .leading, spacing: monthSpacing) {
+                ForEach(0..<rows, id: \.self) { row in
+                    HStack(alignment: .top, spacing: monthSpacing) {
+                        ForEach(Array(periods[(row * yearColumns)..<min((row + 1) * yearColumns, periods.count)])) { period in
+                            VStack {
+                                Text(period.month.formatted(Date.FormatStyle(locale: calendar.locale ?? .current, calendar: calendar, timeZone: calendar.timeZone).month(.wide)))
+                                    .font(.headline)
+                                DefaultWeekdaysHeaderView(headerTextColor: .secondary, calendar: calendar)
+                                grid(period, side: side, periods: periods)
+                            }
+                            .frame(width: monthLength)
+                            .frame(maxWidth: monthLength == nil ? .infinity : nil)
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
         }
     }
-    
-    // MARK: Gestures
-    private func onSwipe() -> some Gesture {
-        DragGesture(minimumDistance: 0,
-                    coordinateSpace: CoordinateSpace.named("calendar.coordinate.space"))
-            .onChanged({ value in
-                hoverPoint = value.location
-            }).onEnded({ value in
-                hoverPoint = nil
-            })
+
+    private func grid(_ period: CalendarPeriod, side: Double?, periods: [CalendarPeriod]) -> some View {
+        let columns = calendar.weekdaySymbols.count
+        let rows = (period.dates.count + columns - 1) / columns
+        // Each week row shares the size computed by the calendar container.
+        return VStack(spacing: 0) {
+            ForEach(0..<rows, id: \.self) { row in
+                let id = CalendarRowID(period: period.id, row: row)
+                HStack(spacing: 0) {
+                    ForEach(Array(period.dates[(row * columns)..<min((row + 1) * columns, period.dates.count)]), id: \.self) { date in
+                        dayCell(date, month: period.month, side: side)
+                    }
+                }
+                .onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { rowFrames[id] = $0 }
+                .onDisappear { rowFrames.removeValue(forKey: id) }
+                .id(id)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .id(period.id)
+        #if !os(tvOS)
+        .simultaneousGesture(DragGesture(minimumDistance: 4, coordinateSpace: .global)
+            .onChanged { extendSelection(at: $0.location, periods: periods) })
+        #endif
     }
-    
-    private func onDayTap(_ date: Date) -> some Gesture {
-        TapGesture().onEnded {
-            guard isMultiselectionEnabled, let oldSelection = selection else {
-                selection = selection?.contains(date) == true ? nil : date...date
+
+    private func dayCell(_ date: Date, month: Date, side: Double?) -> some View {
+        let length: CGFloat? = side.map { CGFloat($0) }
+        let position = CalendarSelection(calendar: calendar).position(of: date, in: selection)
+        return Button {
+            selection = CalendarSelection(calendar: calendar).tapping(date, selection: selection, multiple: isMultiselectionEnabled)
+        } label: {
+            dayView(date, calendar, calendar.isDate(date, equalTo: month, toGranularity: .month), position)
+                .environment(\.calendarDaySize, side)
+                .frame(width: length, height: length)
+                .componentHitArea(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!isSelectionEnabled)
+        .if(side == nil) { $0.aspectRatio(1, contentMode: .fit) }
+        .accessibilityLabel(Text(date.formatted(Date.FormatStyle(locale: calendar.locale ?? .current, calendar: calendar, timeZone: calendar.timeZone).weekday(.wide).day().month(.wide).year())))
+        .accessibilityAddTraits(position == nil ? .componentEmpty : .isSelected)
+    }
+
+    private func extendSelection(at point: CGPoint, periods: [CalendarPeriod]) {
+        guard isSelectionEnabled, isMultiselectionEnabled,
+              point.x.isFinite, point.y.isFinite else { return }
+        let columns = calendar.weekdaySymbols.count
+        for period in periods {
+            for row in 0..<((period.dates.count + columns - 1) / columns) {
+                guard let frame = rowFrames[CalendarRowID(period: period.id, row: row)],
+                      frame.contains(point), frame.width > 0 else { continue }
+                let column = Int((point.x - frame.minX) / (frame.width / Double(columns)))
+                let index = row * columns + column
+                guard period.dates.indices.contains(index) else { return }
+                let updated = CalendarSelection(calendar: calendar).extending(to: period.dates[index], selection: selection)
+                if updated != selection { selection = updated }
                 return
             }
-            
-            if oldSelection.contains(date)
-                || oldSelection.span(calendar: calendar, units: [Calendar.Component.day]) != 0 {
-                selection = nil
-            } else if oldSelection.lowerBound > date {
-                selection = date...oldSelection.upperBound
-            } else if oldSelection.upperBound < date {
-                selection = oldSelection.lowerBound...date
-            } else {
-                selection = nil
-            }
         }
     }
-    
-    // MARK: Private
-    private func numberOfDays(of date: Date) -> Int {
-        guard let range = calendar.range(of: Calendar.Component.day, in: Calendar.Component.month, for: date) else {
-            return 0
-        }
-        return range.count
-    }
-    
-    private func numberOfWeeks(of date: Date) -> Int {
-        guard let range = calendar.range(of: Calendar.Component.weekOfMonth, in: Calendar.Component.month, for: date) else {
-            return 0
-        }
-        return range.count
-    }
-    
-    private func updateSelectionIfNeeded(_ date: Date, forceUpdate: Bool = false) {
-        guard !forceUpdate, let oldSelection = selection else {
-            selection = date...date
-            return
-        }
-        
-        if oldSelection.lowerBound > date {
-            selection = date...oldSelection.upperBound
-        } else if oldSelection.upperBound < date {
-            selection = oldSelection.lowerBound...date
-        }
-    }
-    
-    private func selection(for date: Date) -> DaySelection? {
-        guard let selection = selection else { return nil }
-        let span = selection.span(calendar: calendar, units: [Calendar.Component.day])
-        if selection.lowerBound.compare(with: date, calendar: calendar), span > 0 {
-            return .leading
-        } else if selection.upperBound.compare(with: date, calendar: calendar), span > 0 {
-            return .trailing
-        } else if selection.contains(date) {
-            if span < 1 {
-                return .single
-            }
-            return .inner
-        }
-        return nil
-    }
-    
-    private func date(for day: Int, in week: Int, of date: Date) -> Date {
-        let firstWeekday = calendar.firstWeekday
-        let shift = date.firstWeekday(calendar)
-        let currentDay = date.day(calendar)
-        let offset: Int
-        if shift - firstWeekday < 0 {
-            offset = week * numberOfWeekdays + day - currentDay - (shift - firstWeekday) - 7
-        } else {
-            offset = week * numberOfWeekdays + day - currentDay - (shift - firstWeekday)
-        }
-        return calendar.date(byAdding: Calendar.Component.day, value: offset, to: date) ?? date
-    }
-}
 
-// MARK: Modifiers
-
-extension CalendarContentView {
-    /// Enables or disables multiselection in the calendar content view.
-    ///
-    /// - Parameter enabled: A Boolean value that indicates whether multiselection is enabled. `true` to enable multiselection, `false` to disable it.
-    /// - Returns: The modified calendar content view.
     public func multiselectionEnabled(_ enabled: Bool) -> Self {
-        var view = self
-        view.isSelectionEnabled = enabled
-        return view
-    }
-    
-    /// Enables or disables selection in the calendar content view.
-    ///
-    /// - Parameter enabled: A Boolean value that indicates whether selection is enabled. `true` to enable selection, `false` to disable it.
-    /// - Returns: The modified calendar content view.
-    public func selectionEnabled(_ enabled: Bool) -> Self {
         var view = self
         view.isMultiselectionEnabled = enabled
         return view
     }
+
+    public func selectionEnabled(_ enabled: Bool) -> Self {
+        var view = self
+        view.isSelectionEnabled = enabled
+        return view
+    }
 }
 
-struct CalendarContentView_Previews: PreviewProvider {
-    static var previews: some View {
-        CalendarContentView(selection: .constant(nil), previewDate: Date(), calendar: Calendar(identifier: .gregorian)) { date, calendar, isDateInMonth, isSelected in
-            DefaultDayView(date: date,
-                           calendar: calendar,
-                           isDateInMonth: isDateInMonth,
-                           isSelected: isSelected,
-                           colorSet: DefaultCalendarColorSet(),
-                           contentColor: .orange)
-        }
-    }
+private struct CalendarPeriod: Identifiable {
+    let month: Date
+    let dates: [Date]
+    var id: Date { dates.first ?? month }
+}
+
+// Row bounds remain usable when Android clips a partially visible row to its scroll viewport.
+struct CalendarRowID: Hashable {
+    let period: Date
+    let row: Int
 }

@@ -9,6 +9,7 @@ public protocol CalendarColorSet {
     var selectionColor: Color { get }
     var otherDateColor: Color { get }
     var weekdayHeaderColor: Color { get }
+    var headerTitleColor: Color { get }
     var headerButtonColors: Color { get }
 }
 
@@ -18,9 +19,10 @@ public struct DefaultCalendarColorSet: CalendarColorSet {
     public var todayColor: Color { Color.blue }
     public var sundayColor: Color { Color.red }
     public var saturdayColor: Color { Color.red.opacity(0.6) }
-    public var weekdayColor: Color { Color.white }
-    public var selectionColor: Color { Color.green.opacity(0.4) }
-    public var otherDateColor: Color { Color.white.opacity(0.25) }
-    public var weekdayHeaderColor: Color { Color.white }
-    public var headerButtonColors: Color { Color.white }
+    public var weekdayColor: Color { Color.primary }
+    public var selectionColor: Color { Color.accentColor.opacity(0.4) }
+    public var otherDateColor: Color { Color.secondary }
+    public var weekdayHeaderColor: Color { Color.primary }
+    public var headerTitleColor: Color { Color.primary }
+    public var headerButtonColors: Color { Color.accentColor }
 }

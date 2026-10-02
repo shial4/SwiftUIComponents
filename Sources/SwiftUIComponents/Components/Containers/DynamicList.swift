@@ -1,261 +1,259 @@
 import SwiftUI
-import Foundation
+#if os(Android)
+import SkipBridge
+#endif
 
+/// A native, lazily rendered scroll view with content-sized, index-addressed cells.
+/// Supply `itemLength` or `itemLengths` to override SwiftUI's automatic cell sizing.
+/// Bind `scrollToIndex` to request a cell; requests reset to nil after processing.
+/// Observe native scrolling with `onVisibleCellChange`.
+/// Apple-only `scrollOffset` overloads preserve the negative point-offset API.
+/// Cell identity is its index. Use native `ForEach` when data needs model identity.
 public struct DynamicList<Content: View>: View {
-    @StateObject private var viewModel = ViewModel()
+    @Binding private var scrollToIndex: Int?
+    @State var reportedID: AnyHashable?
+    #if !os(Android)
     @Binding private var scrollOffset: Double
-    
-    private let animation: Animation = .easeInOut(duration: 0.3)
-    
-    private let length: Length
+    private var usesPointOffsets = false
+    @State var position: ScrollPosition
+    @State var viewport = DynamicListViewport()
+    @State var pointOrientation: Orientation
+    #endif
+    private let numberOfItems: Int
+    private let lengths: DynamicListLengths?
     private let cellBuilder: (Int) -> Content
     private var orientation: Orientation
+    private var visibleCellChange: (Int?) -> Void = { _ in }
 
-    public init(
-        scrollOffset: Binding<Double>,
-        orientation: Orientation = .horizontal,
-        numberOfItems: Int,
-        itemLength: Double,
-        viewForCell cellBuilder: @escaping (Int) -> Content
-    ) {
-        self.length = Length(length: itemLength, numberOfItems: numberOfItems)
-        self.cellBuilder = cellBuilder
+    /// Lets SwiftUI determine each cell's length from its content.
+    public init(scrollToIndex: Binding<Int?> = .constant(nil), orientation: Orientation = .horizontal,
+                numberOfItems: Int, @ViewBuilder viewForCell: @escaping (Int) -> Content) {
+        self.init(scrollToIndex: scrollToIndex, orientation: orientation,
+                  numberOfItems: numberOfItems, lengths: nil, viewForCell: viewForCell)
+    }
+
+    public init(scrollToIndex: Binding<Int?> = .constant(nil), orientation: Orientation = .horizontal,
+                numberOfItems: Int, itemLength: Double,
+                @ViewBuilder viewForCell: @escaping (Int) -> Content) {
+        self.init(scrollToIndex: scrollToIndex, orientation: orientation,
+                  numberOfItems: numberOfItems,
+                  lengths: DynamicListLengths(count: numberOfItems, length: itemLength),
+                  viewForCell: viewForCell)
+    }
+
+    public init(scrollToIndex: Binding<Int?> = .constant(nil), orientation: Orientation = .horizontal,
+                itemLengths: [Double], @ViewBuilder viewForCell: @escaping (Int) -> Content) {
+        self.init(scrollToIndex: scrollToIndex, orientation: orientation,
+                  numberOfItems: itemLengths.count, lengths: DynamicListLengths(itemLengths),
+                  viewForCell: viewForCell)
+    }
+
+    private init(scrollToIndex: Binding<Int?>, orientation: Orientation, numberOfItems: Int,
+                 lengths: DynamicListLengths?, viewForCell: @escaping (Int) -> Content) {
+        self._scrollToIndex = scrollToIndex
         self.orientation = orientation
+        let count = lengths?.count ?? max(0, numberOfItems)
+        self.numberOfItems = count
+        self.lengths = lengths
+        self.cellBuilder = viewForCell
+        let initialIndex = count > 0
+            ? scrollToIndex.wrappedValue.map { min(max(0, $0), count - 1) } : nil
+        self._reportedID = State(initialValue: initialIndex.map(AnyHashable.init))
+        #if !os(Android)
+        self._pointOrientation = State(initialValue: orientation)
+        self._scrollOffset = .constant(0)
+        self._position = State(initialValue: ScrollPosition(point: .zero))
+        #endif
+    }
+
+    #if !os(Android)
+    /// Apple compatibility: observe and request a negative offset in points.
+    /// Use `scrollToIndex` for the shared iOS/Android API.
+    public init(scrollOffset: Binding<Double>, orientation: Orientation = .horizontal,
+                numberOfItems: Int, @ViewBuilder viewForCell: @escaping (Int) -> Content) {
+        self.init(scrollOffset: scrollOffset, orientation: orientation,
+                  numberOfItems: numberOfItems, lengths: nil, viewForCell: viewForCell)
+    }
+
+    public init(scrollOffset: Binding<Double>, orientation: Orientation = .horizontal,
+                numberOfItems: Int, itemLength: Double,
+                @ViewBuilder viewForCell: @escaping (Int) -> Content) {
+        self.init(scrollOffset: scrollOffset, orientation: orientation,
+                  numberOfItems: numberOfItems,
+                  lengths: DynamicListLengths(count: numberOfItems, length: itemLength),
+                  viewForCell: viewForCell)
+    }
+
+    public init(scrollOffset: Binding<Double>, orientation: Orientation = .horizontal,
+                itemLengths: [Double], @ViewBuilder viewForCell: @escaping (Int) -> Content) {
+        self.init(scrollOffset: scrollOffset, orientation: orientation,
+                  numberOfItems: itemLengths.count, lengths: DynamicListLengths(itemLengths),
+                  viewForCell: viewForCell)
+    }
+
+    private init(scrollOffset: Binding<Double>, orientation: Orientation, numberOfItems: Int,
+                 lengths: DynamicListLengths?, viewForCell: @escaping (Int) -> Content) {
+        self.init(scrollToIndex: .constant(nil), orientation: orientation,
+                  numberOfItems: numberOfItems, lengths: lengths, viewForCell: viewForCell)
         self._scrollOffset = scrollOffset
+        self.usesPointOffsets = true
+        // Automatic content has no known extent until SwiftUI lays out the lazy stack.
+        let offset = DynamicListLengths.clampedOffset(scrollOffset.wrappedValue,
+                                                     viewport: 0, contentLength: lengths?.total)
+        self._position = State(initialValue: ScrollPosition(point: CGPoint(
+            x: orientation == .horizontal ? -offset : 0,
+            y: orientation == .vertical ? -offset : 0
+        )))
     }
-    
-    public init(
-        scrollOffset: Binding<Double>,
-        orientation: Orientation = .horizontal,
-        itemLengths: [Double],
-        viewForCell cellBuilder: @escaping (Int) -> Content
-    ) {
-        self.length = Length(lengths: itemLengths)
-        self.cellBuilder = cellBuilder
-        self.orientation = orientation
-        self._scrollOffset = scrollOffset
-    }
-    
-    public init(
-        orientation: Orientation = .horizontal,
-        numberOfItems: Int,
-        itemLength: Double,
-        viewForCell cellBuilder: @escaping (Int) -> Content
-    ) {
-        self.init(
-            scrollOffset: .constant(0),
-            orientation: orientation,
-            numberOfItems: numberOfItems,
-            itemLength: itemLength,
-            viewForCell: cellBuilder
-        )
-    }
-    
-    public init(
-        orientation: Orientation = .horizontal,
-        itemLengths: [Double],
-        viewForCell cellBuilder: @escaping (Int) -> Content
-    ) {
-        self.init(
-            scrollOffset: .constant(0),
-            orientation: orientation,
-            itemLengths: itemLengths,
-            viewForCell: cellBuilder
-        )
-    }
-    
+    #endif
+
     public var body: some View {
-        GeometryReader { geometry in
-            listView(geometry.size)
-                .onChange(of: scrollOffset) { value in
-                    guard scrollOffset != viewModel.scrollOffset else { return }
-                    
-                    let scrollOffset: Double
-                    switch orientation {
-                    case .horizontal:
-                        scrollOffset = max(min(0, value), geometry.size.width - length.total)
-                    case .vertical:
-                        scrollOffset = max(min(0, value), geometry.size.height - length.total)
-                    }
-                    
-                    viewModel.previousScrollOffset = scrollOffset
-                    if self.scrollOffset != scrollOffset {
-                        self.scrollOffset = scrollOffset
-                    }
-                    viewModel.isLeadingAnimation = viewModel.scrollOffset < scrollOffset
-                    withAnimation(animation) {
-                        viewModel.scrollOffset = scrollOffset
+        #if !os(Android)
+        if usesPointOffsets { pointOffsetList } else { indexedList }
+        #else
+        indexedList
+        #endif
+    }
+
+    private var indexedList: some View {
+        ScrollViewReader { proxy in
+            nativeList
+                .scrollPosition(id: $reportedID)
+                .task(id: orientation) {
+                    await Task.yield()
+                    requestIndex(scrollToIndex, proxy: proxy)
+                    visibleCellChange(clampedIndex(reportedIndex))
+                }
+                .onChange(of: scrollToIndex) { _, value in requestIndex(value, proxy: proxy) }
+                .onChange(of: reportedID) { _, _ in visibleCellChange(clampedIndex(reportedIndex)) }
+                .onChange(of: numberOfItems) { _, count in
+                    requestIndex(scrollToIndex, proxy: proxy)
+                    if count == 0 {
+                        reportedID = nil
+                        visibleCellChange(nil)
                     }
                 }
         }
+        .id(orientation)
     }
-    
-    private var previousScrollOffset: Double {
-        viewModel.previousScrollOffset
+
+    private var reportedIndex: Int? {
+        #if os(Android)
+        // Fuse returns IDs in its native SwiftHashable wrapper.
+        if let wrapped = reportedID?.base as? SwiftHashable { return wrapped.base as? Int }
+        #endif
+        return reportedID?.base as? Int
     }
-    
-    private func transition(
-        index: Int,
-        start: (index: Int, width: Double),
-        endIndex: Int
-    ) -> AnyTransition {
-        let isLeading: Bool
-        if viewModel.isLeadingAnimation == true {
-            isLeading =  index <= (endIndex - start.index)
+
+    private func clampedIndex(_ index: Int?) -> Int? {
+        guard numberOfItems > 0, let index else { return nil }
+        return min(max(0, index), numberOfItems - 1)
+    }
+
+    private func requestIndex(_ value: Int?, proxy: ScrollViewProxy) {
+        guard let value else { return }
+        let index = clampedIndex(value)
+        scrollToIndex = nil
+        reportedID = index.map(AnyHashable.init)
+        if let index { proxy.scrollTo(index, anchor: orientation == .horizontal ? .leading : .top) }
+    }
+
+    /// Reports the visible cell's index, or nil for empty content.
+    /// Native containers choose which visible cell to report near the trailing edge.
+    public func onVisibleCellChange(_ action: @escaping (Int?) -> Void) -> Self {
+        var view = self
+        view.visibleCellChange = action
+        return view
+    }
+
+    private var nativeList: some View {
+        ScrollView(orientation == .horizontal ? .horizontal : .vertical) {
+            if orientation == .horizontal {
+                LazyHStack(spacing: 0) { cells }.scrollTargetLayout()
+            } else {
+                LazyVStack(spacing: 0) { cells }.scrollTargetLayout()
+            }
+        }
+    }
+
+    #if !os(Android)
+    private var pointOffsetList: some View {
+        ScrollView(orientation == .horizontal ? .horizontal : .vertical) {
+            if orientation == .horizontal {
+                LazyHStack(spacing: 0) { cells }
+                    .frame(width: lengths.map { CGFloat($0.total) }, alignment: .leading)
+            } else {
+                LazyVStack(spacing: 0) { cells }
+                    .frame(height: lengths.map { CGFloat($0.total) }, alignment: .top)
+            }
+        }
+        .scrollPosition($position)
+        .onScrollGeometryChange(for: DynamicListViewport.self) { geometry in
+            DynamicListViewport(
+                offset: orientation == .horizontal ? -geometry.contentOffset.x : -geometry.contentOffset.y,
+                length: orientation == .horizontal ? geometry.containerSize.width : geometry.containerSize.height,
+                contentLength: orientation == .horizontal ? geometry.contentSize.width : geometry.contentSize.height
+            )
+        } action: { oldValue, newValue in
+            let changedAxis = pointOrientation != orientation
+            pointOrientation = orientation
+            let isInitialLayout = viewport.length == 0
+            viewport = newValue
+            if changedAxis {
+                scroll(to: oldValue.offset)
+                return
+            }
+            if oldValue.length != newValue.length || (isInitialLayout && scrollOffset != clampedOffset(scrollOffset)) {
+                scroll(to: isInitialLayout ? scrollOffset : oldValue.offset)
+            } else {
+                let offset = clampedOffset(newValue.offset)
+                viewport.offset = offset
+                if scrollOffset != offset { scrollOffset = offset }
+            }
+        }
+        .onChange(of: scrollOffset) { _, value in
+            guard abs(value - viewport.offset) > 0.5 || !value.isFinite else { return }
+            scroll(to: value)
+        }
+        .onChange(of: lengths) { _, _ in scroll(to: viewport.offset) }
+        .onChange(of: orientation) { _, _ in scroll(to: scrollOffset) }
+    }
+    #endif
+
+    private var cells: some View {
+        ForEach(0..<numberOfItems, id: \.self) { index in
+            let length = lengths.map { CGFloat($0[index]) }
+            cellBuilder(index)
+                .frame(width: orientation == .horizontal ? length : nil,
+                       height: orientation == .vertical ? length : nil)
+                .id(index)
+        }
+    }
+
+    #if !os(Android)
+    private func scroll(to value: Double) {
+        let offset = clampedOffset(value)
+        if lengths == nil, numberOfItems > 0, value.isFinite, value < offset, offset < 0 {
+            // An estimated length can grow while scrolling. Let SwiftUI find the
+            // actual edge, then publish its resulting offset through scroll geometry.
+            if abs(offset - viewport.offset) <= 0.5, scrollOffset != offset { scrollOffset = offset }
+            position.scrollTo(edge: orientation == .horizontal ? .trailing : .bottom)
+            return
+        }
+        if scrollOffset != offset { scrollOffset = offset }
+        if orientation == .horizontal {
+            position.scrollTo(x: -offset)
         } else {
-            isLeading =  index < (endIndex - start.index)
+            position.scrollTo(y: -offset)
         }
-        let x = orientation == .horizontal ? isLeading ? -length[start.index] : length[start.index] : 0
-        let y = orientation == .vertical ? isLeading ? -length[start.index] : length[start.index] : 0
-        return .asymmetric(
-            insertion: AnyTransition.offset(x: x, y: y),
-            removal: AnyTransition.opacity
-        )
     }
 
-    private func dragGesture(screenDimension size: Double) -> some Gesture {
-        DragGesture()
-            .onChanged{ value in
-                let translation = orientation == .horizontal ? value.translation.width : value.translation.height
-                let scrollOffset = max(min(0, previousScrollOffset + translation), size - length.total)
-                viewModel.isLeadingAnimation = nil
-                viewModel.scrollOffset = scrollOffset
-                self.scrollOffset = scrollOffset
-            }
-            .onEnded { value in
-                withAnimation(animation) {
-                    let translation = orientation == .horizontal ? value.predictedEndTranslation.width : value.predictedEndTranslation.height
-                    let scrollOffset = max(min(0, previousScrollOffset + translation), size - length.total)
-                    viewModel.scrollOffset = scrollOffset
-                    self.scrollOffset = scrollOffset
-                    viewModel.previousScrollOffset = viewModel.scrollOffset
-                }
-            }
+    private func clampedOffset(_ value: Double) -> Double {
+        let contentLength = lengths?.total ?? (viewport.length > 0 ? viewport.contentLength : nil)
+        return DynamicListLengths.clampedOffset(value, viewport: viewport.length, contentLength: contentLength)
     }
-    
-    private func index(for offset: Double) -> (index: Int, width: Double) {
-        var startIndex = 0
-        var accumulatedWidth: Double = 0
-        
-        for (index, width) in length.enumerated() {
-            if accumulatedWidth < (offset - width) {
-                startIndex = index
-            } else {
-                break
-            }
-            accumulatedWidth += width
-        }
-        return (startIndex, accumulatedWidth)
-    }
-    
-    private func endIndex(for start: (index: Int, width: Double), screenWidth: Double) -> Int {
-        var endIndex = start.index
-        var accumulatedWidth = start.width
+    #endif
 
-        while endIndex < length.count, accumulatedWidth <= (start.width + screenWidth) {
-            accumulatedWidth += length[endIndex]
-            endIndex += 1
-        }
-        
-        if (endIndex + 1) < length.count {
-            endIndex += 1
-        }
-        
-        return endIndex
-    }
-    
-    private func listView(_ size: CGSize) -> some View {
-        let screenDimension: Double
-        let scrollOffset: Double
-
-        switch orientation {
-        case .horizontal:
-            screenDimension = size.width
-            scrollOffset = viewModel.scrollOffset
-        case .vertical:
-            screenDimension = size.height
-            scrollOffset = viewModel.scrollOffset
-        }
-        
-        let numberOfItems = length.count
-        
-        let start = index(for: abs(scrollOffset))
-        let endIndex = min(endIndex(for: start, screenWidth: screenDimension) + 1, numberOfItems)
-        let visibleRange = start.index ..< endIndex
-        
-        let padding: Double
-        switch orientation {
-        case .horizontal:
-            padding = max(0, start.width - length[start.index])
-        case .vertical:
-            padding = max(0, start.width - length[start.index])
-        }
-        
-        return StackView(orientation: orientation) {
-            let group = Group {
-                Spacer()
-                    .frame(
-                        width: orientation == .horizontal ? padding : nil,
-                        height: orientation == .vertical ? padding : nil
-                    )
-                ForEach(visibleRange, id: \.hashValue) { index in
-                    cellBuilder(index)
-                        .frame(
-                            width: orientation == .horizontal ? length[index] : nil,
-                            height: orientation == .vertical ? length[index] : nil
-                        )
-                        .transition(
-                            transition(index: index, start: start, endIndex: endIndex)
-                        )
-                        .background(Color.green)
-                        .border(Color.blue)
-                }
-            }
-            return group
-        }
-        .frame(maxWidth: Double.infinity, maxHeight: Double.infinity)
-        .offset(x: orientation == .horizontal ? viewModel.scrollOffset : 0,
-                y: orientation == .vertical ? viewModel.scrollOffset : 0)
-        .contentShape(Rectangle())
-        .gesture(dragGesture(screenDimension: screenDimension))
-        .onHover { inside in
-            if inside {
-                onHover(size)
-            } else {
-                cleanUpMonitors()
-            }
-        }
-    }
-    
-    private func cleanUpMonitors() {
-        guard let monitor = viewModel.eventsMonitor else { return }
-        viewModel.eventsMonitor = nil
-        #if canImport(AppKit)
-        NSEvent.removeMonitor(monitor)
-        #endif
-    }
-    
-    private func onHover(_ size: CGSize) {
-        guard viewModel.eventsMonitor == nil else { return }
-        #if canImport(AppKit)
-        viewModel.eventsMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { event in
-            let scrollOffset = max(min(0, viewModel.scrollOffset + event.scrollingDeltaY), size.width - length.total)
-            
-            viewModel.isLeadingAnimation = viewModel.scrollOffset < scrollOffset
-            withAnimation(animation) {
-                viewModel.scrollOffset = scrollOffset
-            }
-            
-            viewModel.previousScrollOffset = scrollOffset
-            if self.scrollOffset != scrollOffset {
-                self.scrollOffset = scrollOffset
-            }
-            
-            return event
-        }
-        #endif
-    }
-    
     public func orientation(_ orientation: Orientation) -> Self {
         var view = self
         view.orientation = orientation
@@ -263,89 +261,81 @@ public struct DynamicList<Content: View>: View {
     }
 }
 
-// MARK: Types
-
-public enum Orientation {
-    case horizontal
-    case vertical
-
-    public func not() -> Orientation {
-        return self == Orientation.horizontal ? Orientation.vertical : Orientation.horizontal
-    }
+public enum Orientation: CaseIterable, Sendable {
+    case horizontal, vertical
+    public func not() -> Self { self == .horizontal ? .vertical : .horizontal }
 }
 
+/// A stack whose axis is selected at runtime, without erasing its content type.
 public struct StackView<Content: View>: View {
-    private var orientation: Orientation
+    private let orientation: Orientation
     private let content: Content
-    
+
     public init(orientation: Orientation, @ViewBuilder content: () -> Content) {
         self.orientation = orientation
         self.content = content()
     }
-    
+
     public var body: some View {
+        #if os(Android)
         if orientation == .horizontal {
-            HStack(spacing: 0) {
-                content
-            }
+            HStack(spacing: 0) { content }
         } else {
-            VStack(spacing: 0) {
-                content
-            }
+            VStack(spacing: 0) { content }
         }
+        #else
+        let layout = orientation == .horizontal
+            ? AnyLayout(HStackLayout(spacing: 0)) : AnyLayout(VStackLayout(spacing: 0))
+        layout { content }
+        #endif
     }
 }
 
-// MARK: Internal types
-
-private class ViewModel: ObservableObject {
-    @Published var scrollOffset: Double = 0
-    var previousScrollOffset: Double = 0
-    var isLeadingAnimation: Bool? = nil
-    var eventsMonitor: Any? = nil
+struct DynamicListViewport: Equatable {
+    var offset: Double = 0
+    var length: Double = 0
+    var contentLength: Double = 0
 }
 
-private struct Length: Sequence, IteratorProtocol {
-    let lengths: [Double]
-    let length: Double
+/// Validates optional explicit size overrides, not measured content sizes.
+/// Keeps uniform sizing O(1) in memory. Invalid dimensions collapse to zero.
+struct DynamicListLengths: Equatable, Sendable {
+    private let values: [Double]
+    private let uniformLength: Double
     let count: Int
     let total: Double
-    
-    private var currentIndex: Int = 0
-    
-    init(lengths: [Double]) {
-        self.lengths = lengths
-        self.length = 0
-        self.count = lengths.count
-        self.total = lengths.reduce(0.0, +)
+
+    init(count: Int, length: Double) {
+        let count = max(0, count)
+        let length = Self.validLength(length)
+        let total = Double(count) * length
+        self.values = []
+        self.count = total.isFinite ? count : 0
+        self.uniformLength = length
+        self.total = total.isFinite ? total : 0
     }
-    
-    init(length: Double, numberOfItems: Int) {
-        self.lengths = []
-        self.length = length
-        self.count = numberOfItems
-        self.total = length * Double(numberOfItems)
+
+    init(_ lengths: [Double]) {
+        let values = lengths.map(Self.validLength)
+        let total = values.reduce(0, +)
+        self.values = total.isFinite ? values : []
+        self.uniformLength = 0
+        self.count = total.isFinite ? values.count : 0
+        self.total = total.isFinite ? total : 0
     }
-    
-    subscript(index: Int) -> Double {
-        get {
-            if !lengths.isEmpty, (0..<lengths.count).contains(index) {
-                return lengths[index]
-            }
-            return length
-        }
+
+    subscript(index: Int) -> Double { values.isEmpty ? uniformLength : values[index] }
+
+    func clampedOffset(_ offset: Double, viewport: Double) -> Double {
+        Self.clampedOffset(offset, viewport: viewport, contentLength: total)
     }
-    
-    func makeIterator() -> Self {
-        return self
+
+    static func clampedOffset(_ offset: Double, viewport: Double, contentLength: Double?) -> Double {
+        let offset = min(0, offset.isFinite ? offset : 0)
+        guard let contentLength else { return offset }
+        let viewport = Self.validLength(viewport)
+        return max(offset, min(0, viewport - Self.validLength(contentLength)))
     }
-    
-    mutating func next() -> Double? {
-        guard currentIndex < count else {
-            return nil
-        }
-        
-        defer { currentIndex += 1 }
-        return self[currentIndex]
-    }
+
+    private static func validLength(_ value: Double) -> Double { value.isFinite ? max(0, value) : 0 }
 }

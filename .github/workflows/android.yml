@@ -1,0 +1,121 @@
+name: Android build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: Build the native Skip Fuse example
+    runs-on: macos-26
+    timeout-minutes: 90
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      SWIFT_VERSION: '6.3.2'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Select the compatible host SDK and Android NDK
+        run: |
+          echo "SDKROOT=$(xcrun --sdk macosx --show-sdk-path)" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/29.0.14206865" >> "$GITHUB_ENV"
+
+      - uses: skiptools/actions/setup-skip@v1
+        with:
+          swift-version: ${{ env.SWIFT_VERSION }}
+          install-swift-android-sdk: 'true'
+          swift-android-sdk-version: ${{ env.SWIFT_VERSION }}
+          swift-android-ndk-version: 'r29'
+          gradle-version: '9.7.1'
+          run-doctor: 'false'
+
+      - name: Generate the host bridges
+        env:
+          SKIP_DYNAMIC_LIBRARIES: '1'
+        run: |
+          "$DEVELOPER_DIR/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift" build \
+            --product ComponentCatalog \
+            --scratch-path "$RUNNER_TEMP/AndroidHost"
+          # Skip reads prebuilt bridges through Xcode's products layout.
+          mkdir -p "$RUNNER_TEMP/AndroidHost/Build/Products/Debug" "$RUNNER_TEMP/AndroidHost/Build/Intermediates.noindex"
+          ln -s "$RUNNER_TEMP/AndroidHost/plugins/outputs" "$RUNNER_TEMP/AndroidHost/Build/Intermediates.noindex/BuildToolPluginIntermediates"
+
+      - name: Compile the shared Swift natively for Android
+        run: |
+          skip android build \
+            --swift-version "$SWIFT_VERSION" \
+            --arch aarch64 \
+            --product ComponentCatalog \
+            --scratch-path "$RUNNER_TEMP/AndroidNative" \
+            --dir "$RUNNER_TEMP/AndroidHost/plugins/outputs/swiftuicomponents/ComponentCatalog/destination/skipstone/ComponentCatalog/build/jni-libs" \
+            -Xswiftc -DSKIP_BRIDGE \
+            -Xswiftc -DTARGET_OS_ANDROID
+
+      - name: Package the Android APK
+        env:
+          SKIP_DYNAMIC_LIBRARIES: '1'
+          SKIP_BRIDGE_ANDROID_BUILD_DISABLED: '1'
+          BUILT_PRODUCTS_DIR: ${{ runner.temp }}/AndroidHost/Build/Products/Debug
+        run: gradle --no-daemon -p Android :app:assembleDebug
+
+      - name: Verify native components are packaged
+        run: |
+          cp .build/Android/app/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/component-catalog-debug.apk"
+          unzip -Z1 "$RUNNER_TEMP/component-catalog-debug.apk" > "$RUNNER_TEMP/apk-files.txt"
+          grep -q '^lib/arm64-v8a/libComponentCatalog.so$' "$RUNNER_TEMP/apk-files.txt"
+          grep -q '^lib/arm64-v8a/libSkipFuseUI.so$' "$RUNNER_TEMP/apk-files.txt"
+          cp LICENSE.md NOTICE "$RUNNER_TEMP/"
+
+      - name: Include Swift dependency licenses and corresponding source links
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import shutil
+
+          runner_temp = Path(os.environ["RUNNER_TEMP"])
+          checkouts = runner_temp / "AndroidHost/checkouts"
+          output = runner_temp / "SwiftPackageLicenses"
+          output.mkdir()
+          sources = ["Resolved Swift dependencies retain their original licenses.", ""]
+          for pin in json.loads(Path("Package.resolved").read_text())["pins"]:
+              identity = pin["identity"]
+              package = checkouts / identity
+              notices = [path for path in package.iterdir() if path.is_file()
+                         and path.name.upper().startswith(("LICENSE", "NOTICE", "COPYING", "COPYRIGHT"))]
+              if not any(path.name.upper().startswith(("LICENSE", "COPYING")) for path in notices):
+                  raise RuntimeError(f"Missing dependency license: {identity}")
+              destination = output / identity
+              destination.mkdir()
+              for notice in notices:
+                  shutil.copyfile(notice, destination / notice.name)
+              revision = pin["state"]["revision"]
+              repository = pin["location"].removesuffix(".git")
+              sources.extend([identity, f"Corresponding source: {repository}/tree/{revision}",
+                              f"License and notices: {identity}/", ""])
+          (output / "SOURCES.txt").write_text("\n".join(sources))
+          PY
+
+      - name: Upload the debug APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: component-catalog-android
+          path: |
+            ${{ runner.temp }}/component-catalog-debug.apk
+            ${{ runner.temp }}/LICENSE.md
+            ${{ runner.temp }}/NOTICE
+            ${{ runner.temp }}/SwiftPackageLicenses
+          if-no-files-found: error
+          retention-days: 7

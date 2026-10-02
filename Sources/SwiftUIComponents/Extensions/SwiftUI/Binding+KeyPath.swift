@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 
+@MainActor
 public extension Binding where Value: Equatable {
     static func create<T: AnyObject>(for keyPath: ReferenceWritableKeyPath<T, Value>, on object: T) -> Binding<Value> {
         Binding(

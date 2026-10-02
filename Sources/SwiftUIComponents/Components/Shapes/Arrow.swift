@@ -3,7 +3,7 @@ import SwiftUI
 /// A shape representing an arrow.
 public struct Arrow: Shape {
     public init() {}
-    
+
     public func path(in rect: CGRect) -> Path {
         Path { path in
             path.move(to: CGPoint(x: 0, y: rect.height * 0.3))
@@ -14,10 +14,11 @@ public struct Arrow: Shape {
             path.addLine(to: CGPoint(x: rect.width * 0.6, y: rect.height * 0.2 ))
             path.addLine(to: CGPoint(x: rect.width * 0.6, y: rect.height * 0.4 ))
             path.closeSubpath()
-        }
+        }.offsetBy(dx: rect.minX, dy: rect.minY)
     }
 }
 
+#if !os(Android)
 struct Arrow_Previews: PreviewProvider {
     static var previews: some View {
         VStack {
@@ -36,4 +37,4 @@ struct Arrow_Previews: PreviewProvider {
         }
     }
 }
-
+#endif

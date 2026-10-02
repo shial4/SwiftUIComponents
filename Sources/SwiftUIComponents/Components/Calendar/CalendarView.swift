@@ -2,23 +2,23 @@ import SwiftUI
 import Foundation
 
 /// Enum defining the type of calendar view.
-public enum CalendarType {
+public enum CalendarType: Equatable, Sendable {
     case yearly(Int), monthly, weekly
 }
 
 /// A customizable calendar view.
 public struct CalendarView<Day, Weekday, Header>: View where Day: View, Weekday: View, Header: View {
-    @Binding var date: Date
-    @Binding var selection: ClosedRange<Date>?
+    @Binding private var date: Date
+    @Binding private var selection: TimeRange?
+
     private let type: CalendarType
-    private var colorSet: CalendarColorSet
     private var calendar: Calendar
     private var isMultiselectionEnabled: Bool = true
     private var isSelectionEnabled: Bool = true
     private var headerView: (_ date: Binding<Date>, _ calendar: Calendar) -> Header
     private var weekdaysView: (_ calendar: Calendar) -> Weekday
     private var dayView: (_ date: Date, _ calendar: Calendar, _ isDateInMonth: Bool, _ isSelected: DaySelection?) -> Day
-    
+
     /// Initializes a calendar view with the specified parameters.
     ///
     /// - Parameters:
@@ -29,41 +29,40 @@ public struct CalendarView<Day, Weekday, Header>: View where Day: View, Weekday:
     ///   - headerView: A closure that returns the header view for the calendar view.
     ///   - weekdaysView: A closure that returns the weekdays view for the calendar view.
     ///   - dayView: A closure that returns the day view for the calendar view.
-    internal init(date: Binding<Date>,
-                  selection: Binding<ClosedRange<Date>?>,
-                  calendar: Calendar,
-                  type: CalendarType = .monthly,
-                  colorSet: CalendarColorSet = DefaultCalendarColorSet(),
-                  headerView: @escaping (_ date: Binding<Date>, _ calendar: Calendar) -> Header,
-                  weekdaysView: @escaping (_ calendar: Calendar) -> Weekday,
-                  dayView: @escaping (_ date: Date, _ calendar: Calendar, _ isDateInMonth: Bool, _ isSelected: DaySelection?) -> Day) {
+    public init(
+        date: Binding<Date>,
+        selection: Binding<TimeRange?>,
+        calendar: Calendar,
+        type: CalendarType = .monthly,
+        @ViewBuilder headerView: @escaping (_ date: Binding<Date>, _ calendar: Calendar) -> Header,
+        @ViewBuilder weekdaysView: @escaping (_ calendar: Calendar) -> Weekday,
+        @ViewBuilder dayView: @escaping (_ date: Date, _ calendar: Calendar, _ isDateInMonth: Bool, _ isSelected: DaySelection?) -> Day
+    ) {
         self._date = date
         self._selection = selection
         self.calendar = calendar
         self.type = type
-        self.colorSet = colorSet
         self.headerView = headerView
         self.weekdaysView = weekdaysView
         self.dayView = dayView
     }
-    
+
     public var body: some View {
         VStack {
-            if case .yearly = type {
-            } else {
-                headerView($date, calendar)
-                weekdaysView(calendar)
+            headerView($date, calendar)
+            switch type {
+            case .yearly: EmptyView()
+            case .monthly, .weekly: weekdaysView(calendar)
             }
-            CalendarContentView<Day>(type: type,
-                                     selection: $selection,
-                                     previewDate: date,
-                                     calendar: calendar,
-                                     dayView: dayView)
+            CalendarContentView<Day>(
+                type: type,
+                selection: $selection,
+                previewDate: date,
+                calendar: calendar,
+                dayView: dayView
+            )
             .selectionEnabled(isSelectionEnabled)
             .multiselectionEnabled(isMultiselectionEnabled)
-        }
-        .task {
-            date = date.normalized()
         }
     }
 }
@@ -80,49 +79,86 @@ extension CalendarView {
         view.calendar = calendar
         return view
     }
-    
+
     /// Enables or disables multiselection in the calendar view.
     ///
     /// - Parameter enabled: A Boolean value indicating whether multiselection should be enabled.
     /// - Returns: A modified `CalendarView` with multiselection enabled or disabled.
     public func multiselectionEnabled(_ enabled: Bool) -> Self {
         var view = self
-        view.isSelectionEnabled = enabled
+        view.isMultiselectionEnabled = enabled
         return view
     }
-    
+
     /// Enables or disables date selection in the calendar view.
     ///
     /// - Parameter enabled: A Boolean value indicating whether date selection should be enabled.
     /// - Returns: A modified `CalendarView` with date selection enabled or disabled.
     public func selectionEnabled(_ enabled: Bool) -> Self {
         var view = self
-        view.isMultiselectionEnabled = enabled
+        view.isSelectionEnabled = enabled
         return view
     }
-    
+
     /// Sets a custom header view for the calendar view.
     ///
     /// - Parameter headerView: A closure that returns the custom header view.
     /// - Returns: A modified `CalendarView` with the custom header view.
     public func headerView<H: View>(@ViewBuilder _ headerView: @escaping (_ date: Binding<Date>, _ calendar: Calendar) -> H) -> CalendarView<Day, Weekday, H> {
-        CalendarView<Day, Weekday, H>(date: $date, selection: $selection, calendar: calendar, headerView: headerView, weekdaysView: weekdaysView, dayView: dayView)
+        CalendarView<Day, Weekday, H>(
+            date: $date,
+            selection: $selection,
+            calendar: calendar,
+            type: type,
+            headerView: headerView,
+            weekdaysView: weekdaysView,
+            dayView: dayView
+        )
+        .selectionEnabled(isSelectionEnabled)
+        .multiselectionEnabled(isMultiselectionEnabled)
     }
-    
+
     /// Sets a custom weekdays view for the calendar view.
     ///
     /// - Parameter weekdaysView: A closure that returns the custom weekdays view.
     /// - Returns: A modified `CalendarView` with the custom weekdays view.
     public func weekdaysView<W: View>(@ViewBuilder _ weekdaysView: @escaping (_ calendar: Calendar) -> W) -> CalendarView<Day, W, Header> {
-        CalendarView<Day, W, Header>(date: $date, selection: $selection, calendar: calendar, headerView: headerView, weekdaysView: weekdaysView, dayView: dayView)
+        CalendarView<Day, W, Header>(
+            date: $date,
+            selection: $selection,
+            calendar: calendar,
+            type: type,
+            headerView: headerView,
+            weekdaysView: weekdaysView,
+            dayView: dayView
+        )
+        .selectionEnabled(isSelectionEnabled)
+        .multiselectionEnabled(isMultiselectionEnabled)
     }
-    
+
     /// Sets a custom day view for the calendar view.
     ///
     /// - Parameter dayView: A closure that returns the custom day view.
     /// - Returns: A modified `CalendarView` with the custom day view.
-    public func dayView<D: View>(@ViewBuilder _ dayView: @escaping (_ date: Date, _ calendar: Calendar, _ isDateInMonth: Bool, _ isSelected: DaySelection?) -> D) -> CalendarView<D, Weekday, Header> {
-        CalendarView<D, Weekday, Header>(date: $date, selection: $selection, calendar: calendar, headerView: headerView, weekdaysView: weekdaysView, dayView: dayView)
+    public func dayView<D: View>(
+        @ViewBuilder _ dayView: @escaping (
+            _ date: Date,
+            _ calendar: Calendar,
+            _ isDateInMonth: Bool,
+            _ isSelected: DaySelection?
+        ) -> D
+    ) -> CalendarView<D, Weekday, Header> {
+        CalendarView<D, Weekday, Header>(
+            date: $date,
+            selection: $selection,
+            calendar: calendar,
+            type: type,
+            headerView: headerView,
+            weekdaysView: weekdaysView,
+            dayView: dayView
+        )
+        .selectionEnabled(isSelectionEnabled)
+        .multiselectionEnabled(isMultiselectionEnabled)
     }
 }
 
@@ -138,11 +174,12 @@ extension CalendarView where Day == DefaultDayView, Header == DefaultCalendarHea
     ///   - type: The type of calendar view to display.
     ///   - colorSet: The color set to use for the calendar view.
     ///   - contentColorIndicator: A closure that returns the content color for a specific date.
+
     public init(date: Binding<Date>,
-                selection: Binding<ClosedRange<Date>?> = .constant(nil),
+                selection: Binding<TimeRange?> = .constant(nil),
                 calendar: Calendar = Calendar(identifier: .gregorian),
                 type: CalendarType = .monthly,
-                colorSet: CalendarColorSet = DefaultCalendarColorSet(),
+                colorSet: any CalendarColorSet = DefaultCalendarColorSet(),
                 contentColorIndicator: @escaping (_ date: Date) -> Color? = {_ in return nil }) {
         self.init(date: date,
                   selection: selection,

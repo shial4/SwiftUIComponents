@@ -14,11 +14,20 @@
 		ADAF1A0E2A4EC47D00539BAB /* RatingExampleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADAF1A082A4EC47D00539BAB /* RatingExampleView.swift */; };
 		ADAF1A0F2A4EC47D00539BAB /* BadgeExampleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADAF1A092A4EC47D00539BAB /* BadgeExampleView.swift */; };
 		ADAF1A102A4EC47D00539BAB /* CalendarExampleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADAF1A0A2A4EC47D00539BAB /* CalendarExampleView.swift */; };
-		ADAF1A112A4EC47D00539BAB /* SliderExampleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADAF1A0B2A4EC47D00539BAB /* SliderExampleView.swift */; };
 		ADAF1A122A4EC47D00539BAB /* CheckboxExampleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADAF1A0C2A4EC47D00539BAB /* CheckboxExampleView.swift */; };
 		ADAF1A132A4EC47D00539BAB /* ProgressExampleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADAF1A0D2A4EC47D00539BAB /* ProgressExampleView.swift */; };
 		ADAF1A1A2A4EC65400539BAB /* SwiftUIComponents in Frameworks */ = {isa = PBXBuildFile; productRef = ADAF1A192A4EC65400539BAB /* SwiftUIComponents */; };
 		ADBF959A2B91A097005767A4 /* LabelExampleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADBF95992B91A097005767A4 /* LabelExampleView.swift */; };
+		7A1D156EE4216EFC819EEC48 /* MuscleMapExampleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFF002090BEC65F6CDD17CAD /* MuscleMapExampleView.swift */; };
+		F7F20B3602ED7343E5504DAC /* DynamicListExampleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B4BD3007C32B64E0F1D997C /* DynamicListExampleView.swift */; };
+		8B08418C86C9729651B4E765 /* InteractionExampleViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3CF3F8E3F518867988A2452 /* InteractionExampleViews.swift */; };
+		9E584B068F45D15445E76A5A /* ShapesExampleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45760D824676DE70D4E0AA6B /* ShapesExampleView.swift */; };
+		9204C1FAF60E7452D4454916 /* ModifiersExampleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F01BF8AD47506FA48C81408F /* ModifiersExampleView.swift */; };
+		381283DAF78B4C309FC8CE31 /* ExampleCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C6AA56C98944420A94BB4AE /* ExampleCard.swift */; };
+		E0A7CA1E29C14D84B8B6A96C /* MuscleMapShowcaseViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 597B36BC97CE4DE4825F4B2B /* MuscleMapShowcaseViews.swift */; };
+		0016D8CFD35B42828F86A2A2 /* MuscleShapeExamples.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5483B2E467134059BF3A3ED6 /* MuscleShapeExamples.swift */; };
+		EB45588F5CD643BCBFF075CC /* CalendarPartsExampleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8C54036FDF74EAF93F436C3 /* CalendarPartsExampleView.swift */; };
+		42359D1FE8D74ADE9FAED57C /* UtilityExampleViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5958EAB4B57C4DB08707220C /* UtilityExampleViews.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -31,11 +40,20 @@
 		ADAF1A082A4EC47D00539BAB /* RatingExampleView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RatingExampleView.swift; sourceTree = "<group>"; };
 		ADAF1A092A4EC47D00539BAB /* BadgeExampleView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BadgeExampleView.swift; sourceTree = "<group>"; };
 		ADAF1A0A2A4EC47D00539BAB /* CalendarExampleView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CalendarExampleView.swift; sourceTree = "<group>"; };
-		ADAF1A0B2A4EC47D00539BAB /* SliderExampleView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SliderExampleView.swift; sourceTree = "<group>"; };
 		ADAF1A0C2A4EC47D00539BAB /* CheckboxExampleView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CheckboxExampleView.swift; sourceTree = "<group>"; };
 		ADAF1A0D2A4EC47D00539BAB /* ProgressExampleView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ProgressExampleView.swift; sourceTree = "<group>"; };
 		ADAF1A172A4EC5EC00539BAB /* SwiftUIComponents */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = SwiftUIComponents; path = ..; sourceTree = "<group>"; };
 		ADBF95992B91A097005767A4 /* LabelExampleView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LabelExampleView.swift; sourceTree = "<group>"; };
+		DFF002090BEC65F6CDD17CAD /* MuscleMapExampleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MuscleMapExampleView.swift; sourceTree = "<group>"; };
+		2B4BD3007C32B64E0F1D997C /* DynamicListExampleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DynamicListExampleView.swift; sourceTree = "<group>"; };
+		C3CF3F8E3F518867988A2452 /* InteractionExampleViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractionExampleViews.swift; sourceTree = "<group>"; };
+		45760D824676DE70D4E0AA6B /* ShapesExampleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShapesExampleView.swift; sourceTree = "<group>"; };
+		F01BF8AD47506FA48C81408F /* ModifiersExampleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModifiersExampleView.swift; sourceTree = "<group>"; };
+		7C6AA56C98944420A94BB4AE /* ExampleCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExampleCard.swift; sourceTree = "<group>"; };
+		597B36BC97CE4DE4825F4B2B /* MuscleMapShowcaseViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MuscleMapShowcaseViews.swift; sourceTree = "<group>"; };
+		5483B2E467134059BF3A3ED6 /* MuscleShapeExamples.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MuscleShapeExamples.swift; sourceTree = "<group>"; };
+		B8C54036FDF74EAF93F436C3 /* CalendarPartsExampleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarPartsExampleView.swift; sourceTree = "<group>"; };
+		5958EAB4B57C4DB08707220C /* UtilityExampleViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UtilityExampleViews.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -92,13 +110,22 @@
 		ADAF1A072A4EC45A00539BAB /* ViewExamples */ = {
 			isa = PBXGroup;
 			children = (
+				5958EAB4B57C4DB08707220C /* UtilityExampleViews.swift */,
+				B8C54036FDF74EAF93F436C3 /* CalendarPartsExampleView.swift */,
+				5483B2E467134059BF3A3ED6 /* MuscleShapeExamples.swift */,
+				597B36BC97CE4DE4825F4B2B /* MuscleMapShowcaseViews.swift */,
+				7C6AA56C98944420A94BB4AE /* ExampleCard.swift */,
+				F01BF8AD47506FA48C81408F /* ModifiersExampleView.swift */,
+				45760D824676DE70D4E0AA6B /* ShapesExampleView.swift */,
+				C3CF3F8E3F518867988A2452 /* InteractionExampleViews.swift */,
+				2B4BD3007C32B64E0F1D997C /* DynamicListExampleView.swift */,
+				DFF002090BEC65F6CDD17CAD /* MuscleMapExampleView.swift */,
 				ADBF95992B91A097005767A4 /* LabelExampleView.swift */,
 				ADAF1A092A4EC47D00539BAB /* BadgeExampleView.swift */,
 				ADAF1A0A2A4EC47D00539BAB /* CalendarExampleView.swift */,
 				ADAF1A0C2A4EC47D00539BAB /* CheckboxExampleView.swift */,
 				ADAF1A0D2A4EC47D00539BAB /* ProgressExampleView.swift */,
 				ADAF1A082A4EC47D00539BAB /* RatingExampleView.swift */,
-				ADAF1A0B2A4EC47D00539BAB /* SliderExampleView.swift */,
 			);
 			path = ViewExamples;
 			sourceTree = "<group>";
@@ -132,7 +159,6 @@
 			buildRules = (
 			);
 			dependencies = (
-				ADAF1A1C2A4EC65C00539BAB /* PBXTargetDependency */,
 			);
 			name = Examples;
 			packageProductDependencies = (
@@ -149,8 +175,8 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 1430;
-				LastUpgradeCheck = 1430;
+				LastSwiftUpdateCheck = 2700;
+				LastUpgradeCheck = 2700;
 				TargetAttributes = {
 					ADAF19F42A4EC3F000539BAB = {
 						CreatedOnToolsVersion = 14.3.1;
@@ -167,6 +193,9 @@
 			);
 			mainGroup = ADAF19EC2A4EC3F000539BAB;
 			productRefGroup = ADAF19F62A4EC3F000539BAB /* Products */;
+			packageReferences = (
+				CA7A106A1DECA7A106A1DE00 /* XCLocalSwiftPackageReference ".." */,
+			);
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -192,8 +221,17 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				42359D1FE8D74ADE9FAED57C /* UtilityExampleViews.swift in Sources */,
+				EB45588F5CD643BCBFF075CC /* CalendarPartsExampleView.swift in Sources */,
+				0016D8CFD35B42828F86A2A2 /* MuscleShapeExamples.swift in Sources */,
+				E0A7CA1E29C14D84B8B6A96C /* MuscleMapShowcaseViews.swift in Sources */,
+				381283DAF78B4C309FC8CE31 /* ExampleCard.swift in Sources */,
+				9204C1FAF60E7452D4454916 /* ModifiersExampleView.swift in Sources */,
+				9E584B068F45D15445E76A5A /* ShapesExampleView.swift in Sources */,
+				8B08418C86C9729651B4E765 /* InteractionExampleViews.swift in Sources */,
+				F7F20B3602ED7343E5504DAC /* DynamicListExampleView.swift in Sources */,
+				7A1D156EE4216EFC819EEC48 /* MuscleMapExampleView.swift in Sources */,
 				ADAF1A132A4EC47D00539BAB /* ProgressExampleView.swift in Sources */,
-				ADAF1A112A4EC47D00539BAB /* SliderExampleView.swift in Sources */,
 				ADAF19FB2A4EC3F000539BAB /* ContentView.swift in Sources */,
 				ADBF959A2B91A097005767A4 /* LabelExampleView.swift in Sources */,
 				ADAF1A122A4EC47D00539BAB /* CheckboxExampleView.swift in Sources */,
@@ -206,12 +244,7 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
-/* Begin PBXTargetDependency section */
-		ADAF1A1C2A4EC65C00539BAB /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			productRef = ADAF1A1B2A4EC65C00539BAB /* SwiftUIComponents */;
-		};
-/* End PBXTargetDependency section */
+
 
 /* Begin XCBuildConfiguration section */
 		ADAF1A022A4EC3F200539BAB /* Debug */ = {
@@ -344,17 +377,17 @@
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 16.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-				MACOSX_DEPLOYMENT_TARGET = 13.3;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.swiftui.components.Examples;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
@@ -380,17 +413,17 @@
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 16.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-				MACOSX_DEPLOYMENT_TARGET = 13.3;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.swiftui.components.Examples;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
@@ -418,15 +451,20 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		CA7A106A1DECA7A106A1DE00 /* XCLocalSwiftPackageReference ".." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ..;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		ADAF1A192A4EC65400539BAB /* SwiftUIComponents */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = CA7A106A1DECA7A106A1DE00 /* XCLocalSwiftPackageReference ".." */;
 			productName = SwiftUIComponents;
 		};
-		ADAF1A1B2A4EC65C00539BAB /* SwiftUIComponents */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = SwiftUIComponents;
-		};
+
 /* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = ADAF19ED2A4EC3F000539BAB /* Project object */;

@@ -1,57 +1,56 @@
 import Foundation
 import SwiftUI
-import Combine
+#if os(Android)
+import SkipAndroidBridge
+public typealias CodableStorage = AndroidUserDefaults
+#else
+public typealias CodableStorage = Foundation.UserDefaults
+#endif
 
+/// JSON-backed AppStorage. Separate wrappers for the same key stay in sync.
+/// Failed encodes preserve the previously stored value. The projected value is a binding.
+@MainActor
 @propertyWrapper
 public struct CodableAppStorage<Value: Codable>: DynamicProperty {
-    @StateObject private var valuePublisher: ValuePublisher<Value>
-    private let key: String
-    
+    @AppStorage private var data: Data
+    private let defaultValue: Value
+
+    public init(wrappedValue defaultValue: Value, _ key: String, store: CodableStorage? = nil) {
+        self.defaultValue = defaultValue
+        self._data = AppStorage(wrappedValue: Data(), key, store: store)
+        #if os(Android)
+        // Skip does not discover AppStorage nested inside a custom property wrapper.
+        // Activate its existing SharedPreferences observer and Compose state directly.
+        self._data.projectedValue.appStorageBox?.Java_initStateSupport().trackState()
+        #endif
+    }
+
     public var wrappedValue: Value {
-        get { valuePublisher.value }
-        nonmutating set { valuePublisher.value = newValue }
-    }
-
-    public init(wrappedValue defaultValue: Value, _ key: String) {
-        self.key = key
-        if let data = UserDefaults.standard.data(forKey: key),
-           let value = try? JSONDecoder().decode(Value.self, from: data) {
-            self._valuePublisher = StateObject(wrappedValue: ValuePublisher(initialValue: value, key: key))
-        } else {
-            self._valuePublisher = StateObject(wrappedValue: ValuePublisher(initialValue: defaultValue, key: key))
-        }
-    }
-}
-
-private class ValuePublisher<T: Codable>: ObservableObject {
-    @Published var value: T {
-        didSet {
-            let data = try? JSONEncoder().encode(value)
-            UserDefaults.standard.setValue(data, forKey: key)
+        get { (try? JSONDecoder().decode(Value.self, from: data)) ?? defaultValue }
+        nonmutating set {
+            guard let encoded = try? JSONEncoder().encode(newValue) else { return }
+            data = encoded
         }
     }
 
-    let key: String
-
-    init(initialValue: T, key: String) {
-        self.value = initialValue
-        self.key = key
+    public var projectedValue: Binding<Value> {
+        Binding(get: { wrappedValue }, set: { wrappedValue = $0 })
     }
 }
 
 public extension UserDefaults {
+    /// Stores JSON data, removes the key for nil, and preserves data on encoding failure.
     func setCodable<T: Codable>(_ value: T?, forKey key: String) {
-        let encoder = JSONEncoder()
-        if let encoded = try? encoder.encode(value) {
-            set(encoded, forKey: key)
+        guard let value else {
+            removeObject(forKey: key)
+            return
         }
+        guard let encoded = try? JSONEncoder().encode(value) else { return }
+        set(encoded, forKey: key)
     }
-    
+
     func codable<T: Codable>(forKey key: String) -> T? {
-        if let data = value(forKey: key) as? Data {
-            let decoder = JSONDecoder()
-            return try? decoder.decode(T.self, from: data)
-        }
-        return nil
+        guard let data = data(forKey: key) else { return nil }
+        return try? JSONDecoder().decode(T.self, from: data)
     }
 }

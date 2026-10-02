@@ -1,63 +1,30 @@
 import SwiftUI
 
+// Retained for clients that use these public preference keys directly.
 public struct SizePreferenceKey: PreferenceKey {
-    public static var defaultValue: CGSize = .zero
-    
-    public static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
-        value = nextValue()
-    }
+    public static let defaultValue: CGSize = .zero
+    public static func reduce(value: inout CGSize, nextValue: () -> CGSize) { value = nextValue() }
 }
 
 public struct FramePreferenceKey: PreferenceKey {
-    public static var defaultValue: CGRect = .zero
-    
-    public static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
-        value = nextValue()
-    }
+    public static let defaultValue: CGRect = .zero
+    public static func reduce(value: inout CGRect, nextValue: () -> CGRect) { value = nextValue() }
 }
 
 public extension View {
     func size(onChange: @escaping (CGSize) -> Void) -> some View {
-        background(
-            GeometryReader { proxy in
-                Color.clear
-                    .preference(key: SizePreferenceKey.self, value: proxy.size)
-            }
-        )
-        .onPreferenceChange(SizePreferenceKey.self, perform: onChange)
+        onGeometryChange(for: CGSize.self, of: \.size, action: onChange)
     }
-    
+
     func size(onChange size: Binding<CGSize>) -> some View {
-        background(
-            GeometryReader { proxy in
-                Color.clear
-                    .preference(key: SizePreferenceKey.self, value: proxy.size)
-            }
-        )
-        .onPreferenceChange(SizePreferenceKey.self, perform: { value in
-            size.wrappedValue = value
-        })
+        self.size { size.wrappedValue = $0 }
     }
-    
+
     func frame(onChange: @escaping (CGRect) -> Void) -> some View {
-        background(
-            GeometryReader { proxy in
-                Color.clear
-                    .preference(key: FramePreferenceKey.self, value: proxy.frame(in: CoordinateSpace.global))
-            }
-        )
-        .onPreferenceChange(FramePreferenceKey.self, perform: onChange)
+        onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }, action: onChange)
     }
-    
+
     func frame(onChange frame: Binding<CGRect>) -> some View {
-        background(
-            GeometryReader { proxy in
-                Color.clear
-                    .preference(key: FramePreferenceKey.self, value: proxy.frame(in: CoordinateSpace.global))
-            }
-        )
-        .onPreferenceChange(FramePreferenceKey.self, perform: { value in
-            frame.wrappedValue = value
-        })
+        self.frame { frame.wrappedValue = $0 }
     }
 }

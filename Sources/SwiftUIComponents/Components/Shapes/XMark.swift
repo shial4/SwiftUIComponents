@@ -15,6 +15,8 @@ public struct XMark: Shape {
     }
 }
 
+#if !os(Android)
 #Preview {
     XMark()
 }
+#endif

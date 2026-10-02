@@ -1,27 +1,97 @@
-# Xcode
-.DS_Store
-build/
-DerivedData/
-/.build
-/Packages
-/*.xcodeproj
+# Xcode / Swift
+
+## User-specific Xcode settings
 xcuserdata/
-.swiftpm/config/registries.json
-.swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
-.netrc
+*.xcuserstate
+
 *.pbxuser
 !default.pbxuser
-*.xcworkspace
-!*.xcworkspace
-*.xcworkspacedata
-!*.xcworkspacedata
-*.xcproj
-!*.xcproj
-*.swiftpm
-*.playground
+
+*.mode1v3
+!default.mode1v3
+
+*.mode2v3
+!default.mode2v3
+
+*.perspectivev3
+!default.perspectivev3
+
+*.moved-aside
+*.xcscmblueprint
+*.xccheckout
+
+## Build output
+.build/
+build/
+DerivedData/
+xcodebuild*.log
+*.profraw
+
+## Swift Package Manager
+.swiftpm/
+Packages/
+Package.pins
+
+# Keep Package.resolved committed for apps/executables.
+# Ignore it for reusable library packages if desired:
+# Package.resolved
+
+## App packaging / signing
+*.ipa
+*.dSYM
+*.dSYM.zip
+*.mobileprovision
+*.cer
+*.p12
+*.p12.password
+
+## Obj-C / Swift generated
+*.hmap
+
+## Playgrounds
+*.playground/
+timeline.xctimeline
+playground.xcworkspace
+
+
+# Carthage
+Carthage/Build/
+
+
+# Android / Gradle
+local.properties
+.gradle/
+.android/
+.kotlin/
+
+Android/app/keystore.jks
+Android/app/keystore.properties
+
+
+# Ruby / Bundler
+.bundle/
+vendor/bundle/
+
+
+# fastlane
+**/fastlane/apikey.json
+**/fastlane/report.xml
+**/fastlane/README.md
+**/fastlane/Preview.html
+**/fastlane/test_output/
+**/fastlane/.env
+
+
+# IDEs
+.idea/
+
+
+# Editors
+
+## Vim
+.*.swp
+.*.swo
+
 
 # macOS
 .DS_Store
-
-# Swift Package Manager
-.build/

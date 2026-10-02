@@ -1,0 +1,3 @@
+# Shared component behavior is compiled as Swift on Android.
+skip:
+  mode: 'native'
