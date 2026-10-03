@@ -177,56 +177,26 @@ public struct DynamicList<Content: View>: View {
     private var pointOffsetList: some View {
         ScrollViewReader { proxy in
             ScrollView(orientation == .horizontal ? .horizontal : .vertical) {
-                if orientation == .horizontal {
-                    LazyHStack(spacing: 0) { pointOffsetCells }
-                        .frame(width: lengths.map { CGFloat($0.total) }, alignment: .leading)
-                } else {
-                    LazyVStack(spacing: 0) { pointOffsetCells }
-                        .frame(height: lengths.map { CGFloat($0.total) }, alignment: .top)
-                }
+                pointOffsetContent
+                    // Observe the laid-out content, including lazy-stack estimate corrections.
+                    .onGeometryChange(for: DynamicListViewport.self) { geometry in
+                        let space = NamedCoordinateSpace.scrollView(axis: orientation == .horizontal ? .horizontal : .vertical)
+                        let frame = geometry.frame(in: space)
+                        let bounds = geometry.bounds(of: space)?.size ?? .zero
+                        return DynamicListViewport(
+                            offset: orientation == .horizontal ? frame.minX : frame.minY,
+                            length: orientation == .horizontal ? bounds.width : bounds.height,
+                            contentLength: orientation == .horizontal ? frame.width : frame.height
+                        )
+                    } action: { oldValue, newValue in
+                        updatePointViewport(from: oldValue, to: newValue, proxy: proxy)
+                    }
             }
             .scrollPosition($position)
             .onChange(of: visiblePointIDs) { oldIDs, ids in
                 if oldIDs.max() != ids.max() { visibleCellChange(ids.max()) }
                 if let initialPointOffset, viewport.length > 0 {
                     scroll(to: initialPointOffset, proxy: proxy)
-                }
-            }
-            .onScrollGeometryChange(for: DynamicListViewport.self) { geometry in
-                DynamicListViewport(
-                    offset: orientation == .horizontal ? -geometry.contentOffset.x : -geometry.contentOffset.y,
-                    length: orientation == .horizontal ? geometry.containerSize.width : geometry.containerSize.height,
-                    contentLength: orientation == .horizontal ? geometry.contentSize.width : geometry.contentSize.height
-                )
-            } action: { oldValue, newValue in
-                guard newValue.length > 0 else { return }
-                let changedAxis = pointOrientation != orientation
-                pointOrientation = orientation
-                viewport = newValue
-                if let initialPointOffset {
-                    guard lengths != nil || numberOfItems == 0 || newValue.contentLength > 0 else { return }
-                    let offset = clampedOffset(initialPointOffset)
-                    let targetsEnd = lengths == nil && initialPointOffset.isFinite
-                        && initialPointOffset < offset && offset < 0
-                    if abs(newValue.offset - offset) > 0.5 || (targetsEnd && !visiblePointIDs.contains(numberOfItems - 1)) {
-                        scroll(to: initialPointOffset, proxy: proxy)
-                    } else {
-                        self.initialPointOffset = nil
-                        viewport.offset = offset
-                        if scrollOffset != offset { scrollOffset = offset }
-                    }
-                    return
-                }
-                if changedAxis {
-                    scroll(to: oldValue.offset, proxy: proxy)
-                    return
-                }
-                if oldValue.length != newValue.length {
-                    scroll(to: oldValue.offset, proxy: proxy)
-                } else {
-                    let offset = clampedOffset(newValue.offset)
-                    viewport.offset = offset
-                    if scrollOffset != offset { scrollOffset = offset }
                 }
             }
             .onChange(of: scrollOffset) { _, value in
@@ -236,6 +206,51 @@ public struct DynamicList<Content: View>: View {
             }
             .onChange(of: lengths) { _, _ in scroll(to: viewport.offset, proxy: proxy) }
             .onChange(of: orientation) { _, _ in scroll(to: scrollOffset, proxy: proxy) }
+        }
+    }
+
+    @ViewBuilder private var pointOffsetContent: some View {
+        if orientation == .horizontal {
+            LazyHStack(spacing: 0) { pointOffsetCells }
+                .frame(width: lengths.map { CGFloat($0.total) }, alignment: .leading)
+        } else {
+            LazyVStack(spacing: 0) { pointOffsetCells }
+                .frame(height: lengths.map { CGFloat($0.total) }, alignment: .top)
+        }
+    }
+
+    private func updatePointViewport(from oldValue: DynamicListViewport, to newValue: DynamicListViewport,
+                                     proxy: ScrollViewProxy) {
+        guard newValue.length > 0 else { return }
+        let changedAxis = pointOrientation != orientation
+        pointOrientation = orientation
+        viewport = newValue
+        if let initialPointOffset {
+            guard lengths != nil || numberOfItems == 0 || newValue.contentLength > 0 else { return }
+            let offset = clampedOffset(initialPointOffset)
+            let targetsEnd = lengths == nil && initialPointOffset.isFinite
+                && initialPointOffset < offset && offset < 0
+            // Native scroll views can round the final position to a whole point.
+            if abs(newValue.offset - offset) > 1 || (targetsEnd && !visiblePointIDs.contains(numberOfItems - 1)) {
+                scroll(to: initialPointOffset, proxy: proxy)
+            } else {
+                self.initialPointOffset = nil
+                let actualOffset = clampedOffset(newValue.offset)
+                viewport.offset = actualOffset
+                if scrollOffset != actualOffset { scrollOffset = actualOffset }
+            }
+            return
+        }
+        if changedAxis {
+            scroll(to: oldValue.offset, proxy: proxy)
+            return
+        }
+        if oldValue.length != newValue.length {
+            scroll(to: oldValue.offset, proxy: proxy)
+        } else {
+            let offset = clampedOffset(newValue.offset)
+            viewport.offset = offset
+            if scrollOffset != offset { scrollOffset = offset }
         }
     }
 
