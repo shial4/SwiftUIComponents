@@ -44,12 +44,12 @@ Swift 6.3 or later.
 
 ## Install
 
-In Xcode, choose **File > Add Package Dependencies**, enter `https://github.com/shial4/SwiftUIComponents.git`, and add the **SwiftUIComponents** library to your target.
+In Xcode, choose **File > Add Package Dependencies**, enter `https://github.com/shial4/SwiftUIComponents.git`, choose **Up to Next Major Version** starting at **1.0.0**, and add the **SwiftUIComponents** library to your target.
 
 Or add the package to `Package.swift`:
 
 ```swift
-.package(url: "https://github.com/shial4/SwiftUIComponents.git", branch: "main")
+.package(url: "https://github.com/shial4/SwiftUIComponents.git", from: "1.0.0")
 ```
 
 Then add its product to your target's dependencies:
