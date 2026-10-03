@@ -138,10 +138,11 @@ struct DynamicListIntegrationTests {
     }
 
     @Test("Automatic lists resolve an initial offset beyond their estimated end",
-          arguments: [Orientation.horizontal, .vertical])
-    func automaticInitialEnd(orientation: Orientation) async throws {
-        let model = ListState(orientation: orientation, offset: -100_000)
+          arguments: [Orientation.horizontal, .vertical], [30, 10_000])
+    func automaticInitialEnd(orientation: Orientation, count: Int) async throws {
+        let model = ListState(orientation: orientation, offset: -100_000_000)
         model.automatic = true
+        model.count = count
         let window = mount(model)
         defer { window.close() }
         let scrollView = try await findScrollView(in: window)
@@ -149,7 +150,10 @@ struct DynamicListIntegrationTests {
             guard let document = scrollView.documentView else { return false }
             let extent = orientation == .horizontal ? document.frame.width : document.frame.height
             let viewport = orientation == .horizontal ? scrollView.contentView.bounds.width : scrollView.contentView.bounds.height
-            return abs(model.offset + extent - viewport) < 2 && abs(axisOffset(scrollView, orientation) + model.offset) < 2
+            return model.appeared.contains(model.count - 1)
+                && model.visibleIndex == model.count - 1
+                && abs(model.offset + extent - viewport) < 2
+                && abs(axisOffset(scrollView, orientation) + model.offset) < 2
         }
     }
 
@@ -283,6 +287,7 @@ private struct ListHarness: View {
                 if model.observesOffset {
                     DynamicList(scrollOffset: $model.offset, orientation: model.orientation,
                                 numberOfItems: model.count) { automaticCell($0) }
+                        .onVisibleCellChange { model.visibleIndex = $0 }
                 } else {
                     DynamicList(orientation: model.orientation, numberOfItems: model.count) { automaticCell($0) }
                 }

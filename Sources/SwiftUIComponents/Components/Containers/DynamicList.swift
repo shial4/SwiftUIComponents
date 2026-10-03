@@ -18,6 +18,8 @@ public struct DynamicList<Content: View>: View {
     @State var position: ScrollPosition
     @State var viewport = DynamicListViewport()
     @State var pointOrientation: Orientation
+    @State var initialPointOffset: Double?
+    @State var visiblePointIDs: Set<Int> = []
     #endif
     private let numberOfItems: Int
     private let lengths: DynamicListLengths?
@@ -97,13 +99,8 @@ public struct DynamicList<Content: View>: View {
                   numberOfItems: numberOfItems, lengths: lengths, viewForCell: viewForCell)
         self._scrollOffset = scrollOffset
         self.usesPointOffsets = true
-        // Automatic content has no known extent until SwiftUI lays out the lazy stack.
-        let offset = DynamicListLengths.clampedOffset(scrollOffset.wrappedValue,
-                                                     viewport: 0, contentLength: lengths?.total)
-        self._position = State(initialValue: ScrollPosition(point: CGPoint(
-            x: orientation == .horizontal ? -offset : 0,
-            y: orientation == .vertical ? -offset : 0
-        )))
+        // Apply the initial request after layout supplies the viewport and content extent.
+        self._initialPointOffset = State(initialValue: scrollOffset.wrappedValue)
     }
     #endif
 
@@ -178,66 +175,105 @@ public struct DynamicList<Content: View>: View {
 
     #if !os(Android)
     private var pointOffsetList: some View {
-        ScrollView(orientation == .horizontal ? .horizontal : .vertical) {
-            if orientation == .horizontal {
-                LazyHStack(spacing: 0) { cells }
-                    .frame(width: lengths.map { CGFloat($0.total) }, alignment: .leading)
-            } else {
-                LazyVStack(spacing: 0) { cells }
-                    .frame(height: lengths.map { CGFloat($0.total) }, alignment: .top)
+        ScrollViewReader { proxy in
+            ScrollView(orientation == .horizontal ? .horizontal : .vertical) {
+                if orientation == .horizontal {
+                    LazyHStack(spacing: 0) { pointOffsetCells }
+                        .frame(width: lengths.map { CGFloat($0.total) }, alignment: .leading)
+                } else {
+                    LazyVStack(spacing: 0) { pointOffsetCells }
+                        .frame(height: lengths.map { CGFloat($0.total) }, alignment: .top)
+                }
             }
-        }
-        .scrollPosition($position)
-        .onScrollGeometryChange(for: DynamicListViewport.self) { geometry in
-            DynamicListViewport(
-                offset: orientation == .horizontal ? -geometry.contentOffset.x : -geometry.contentOffset.y,
-                length: orientation == .horizontal ? geometry.containerSize.width : geometry.containerSize.height,
-                contentLength: orientation == .horizontal ? geometry.contentSize.width : geometry.contentSize.height
-            )
-        } action: { oldValue, newValue in
-            let changedAxis = pointOrientation != orientation
-            pointOrientation = orientation
-            let isInitialLayout = viewport.length == 0
-            viewport = newValue
-            if changedAxis {
-                scroll(to: oldValue.offset)
-                return
+            .scrollPosition($position)
+            .onChange(of: visiblePointIDs) { oldIDs, ids in
+                if oldIDs.max() != ids.max() { visibleCellChange(ids.max()) }
+                if let initialPointOffset, viewport.length > 0 {
+                    scroll(to: initialPointOffset, proxy: proxy)
+                }
             }
-            if oldValue.length != newValue.length || (isInitialLayout && scrollOffset != clampedOffset(scrollOffset)) {
-                scroll(to: isInitialLayout ? scrollOffset : oldValue.offset)
-            } else {
-                let offset = clampedOffset(newValue.offset)
-                viewport.offset = offset
-                if scrollOffset != offset { scrollOffset = offset }
+            .onScrollGeometryChange(for: DynamicListViewport.self) { geometry in
+                DynamicListViewport(
+                    offset: orientation == .horizontal ? -geometry.contentOffset.x : -geometry.contentOffset.y,
+                    length: orientation == .horizontal ? geometry.containerSize.width : geometry.containerSize.height,
+                    contentLength: orientation == .horizontal ? geometry.contentSize.width : geometry.contentSize.height
+                )
+            } action: { oldValue, newValue in
+                guard newValue.length > 0 else { return }
+                let changedAxis = pointOrientation != orientation
+                pointOrientation = orientation
+                viewport = newValue
+                if let initialPointOffset {
+                    guard lengths != nil || numberOfItems == 0 || newValue.contentLength > 0 else { return }
+                    let offset = clampedOffset(initialPointOffset)
+                    let targetsEnd = lengths == nil && initialPointOffset.isFinite
+                        && initialPointOffset < offset && offset < 0
+                    if abs(newValue.offset - offset) > 0.5 || (targetsEnd && !visiblePointIDs.contains(numberOfItems - 1)) {
+                        scroll(to: initialPointOffset, proxy: proxy)
+                    } else {
+                        self.initialPointOffset = nil
+                        viewport.offset = offset
+                        if scrollOffset != offset { scrollOffset = offset }
+                    }
+                    return
+                }
+                if changedAxis {
+                    scroll(to: oldValue.offset, proxy: proxy)
+                    return
+                }
+                if oldValue.length != newValue.length {
+                    scroll(to: oldValue.offset, proxy: proxy)
+                } else {
+                    let offset = clampedOffset(newValue.offset)
+                    viewport.offset = offset
+                    if scrollOffset != offset { scrollOffset = offset }
+                }
             }
+            .onChange(of: scrollOffset) { _, value in
+                guard abs(value - viewport.offset) > 0.5 || !value.isFinite else { return }
+                initialPointOffset = nil
+                scroll(to: value, proxy: proxy)
+            }
+            .onChange(of: lengths) { _, _ in scroll(to: viewport.offset, proxy: proxy) }
+            .onChange(of: orientation) { _, _ in scroll(to: scrollOffset, proxy: proxy) }
         }
-        .onChange(of: scrollOffset) { _, value in
-            guard abs(value - viewport.offset) > 0.5 || !value.isFinite else { return }
-            scroll(to: value)
+    }
+
+    private var pointOffsetCells: some View {
+        ForEach(0..<numberOfItems, id: \.self) { index in
+            cell(at: index)
+                .onScrollVisibilityChange(threshold: 0.001) { visible in
+                    if visible {
+                        visiblePointIDs.insert(index)
+                    } else {
+                        visiblePointIDs.remove(index)
+                    }
+                }
         }
-        .onChange(of: lengths) { _, _ in scroll(to: viewport.offset) }
-        .onChange(of: orientation) { _, _ in scroll(to: scrollOffset) }
     }
     #endif
 
     private var cells: some View {
         ForEach(0..<numberOfItems, id: \.self) { index in
-            let length = lengths.map { CGFloat($0[index]) }
-            cellBuilder(index)
-                .frame(width: orientation == .horizontal ? length : nil,
-                       height: orientation == .vertical ? length : nil)
-                .id(index)
+            cell(at: index)
         }
     }
 
+    private func cell(at index: Int) -> some View {
+        let length = lengths.map { CGFloat($0[index]) }
+        return cellBuilder(index)
+            .frame(width: orientation == .horizontal ? length : nil,
+                   height: orientation == .vertical ? length : nil)
+            .id(index)
+    }
+
     #if !os(Android)
-    private func scroll(to value: Double) {
+    private func scroll(to value: Double, proxy: ScrollViewProxy) {
         let offset = clampedOffset(value)
         if lengths == nil, numberOfItems > 0, value.isFinite, value < offset, offset < 0 {
-            // An estimated length can grow while scrolling. Let SwiftUI find the
-            // actual edge, then publish its resulting offset through scroll geometry.
+            // Resolve the last cell by identity rather than the lazy stack's estimated edge.
             if abs(offset - viewport.offset) <= 0.5, scrollOffset != offset { scrollOffset = offset }
-            position.scrollTo(edge: orientation == .horizontal ? .trailing : .bottom)
+            proxy.scrollTo(numberOfItems - 1, anchor: orientation == .horizontal ? .trailing : .bottom)
             return
         }
         if scrollOffset != offset { scrollOffset = offset }
