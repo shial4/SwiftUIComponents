@@ -1,8 +1,8 @@
 # SwiftUIComponents
 
-[![Swift tests](https://github.com/shial4/SwiftUIComponents/actions/workflows/tests.yml/badge.svg?branch=main&event=push)](https://github.com/shial4/SwiftUIComponents/actions/workflows/tests.yml)
-[![iOS build](https://github.com/shial4/SwiftUIComponents/actions/workflows/ios.yml/badge.svg?branch=main&event=push)](https://github.com/shial4/SwiftUIComponents/actions/workflows/ios.yml)
-[![Android build](https://github.com/shial4/SwiftUIComponents/actions/workflows/android.yml/badge.svg?branch=main&event=push)](https://github.com/shial4/SwiftUIComponents/actions/workflows/android.yml)
+[![Swift tests](https://github.com/shial4/SwiftUIComponents/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/shial4/SwiftUIComponents/actions/workflows/tests.yml)
+[![iOS build](https://github.com/shial4/SwiftUIComponents/actions/workflows/ios.yml/badge.svg?branch=main)](https://github.com/shial4/SwiftUIComponents/actions/workflows/ios.yml)
+[![Android build](https://github.com/shial4/SwiftUIComponents/actions/workflows/android.yml/badge.svg?branch=main)](https://github.com/shial4/SwiftUIComponents/actions/workflows/android.yml)
 
 [![Swift](https://img.shields.io/badge/Swift-6.3%2B-orange?logo=swift)](#requirements)
 [![iOS](https://img.shields.io/badge/iOS-18%2B-blue?logo=apple)](#requirements)
