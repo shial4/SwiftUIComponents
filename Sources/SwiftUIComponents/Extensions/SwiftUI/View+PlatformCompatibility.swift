@@ -1,6 +1,21 @@
 import SwiftUI
+#if os(Android)
+import SkipBridge
+#endif
 
 extension View {
+    /// Skip's focused modifier requests focus but does not clear it when set to false.
+    func componentDismissKeyboard() {
+        #if os(Android)
+        guard let activity = UIApplication.shared.dynamicAndroidActivity(),
+              let field: AnyDynamicObject = try? activity.getCurrentFocus() else { return }
+        let keyboard: AnyDynamicObject? = try? activity.getSystemService("input_method")
+        let token: AnyDynamicObject? = try? field.getWindowToken()
+        let _: Bool? = try? keyboard?.hideSoftInputFromWindow(token, 0)
+        let _: Void? = try? field.clearFocus()
+        #endif
+    }
+
     /// Skip uses the background's layout bounds for gesture hit testing.
     func componentHitArea<S: Shape>(_ shape: S) -> some View {
         #if os(Android)

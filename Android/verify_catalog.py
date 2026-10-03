@@ -106,6 +106,28 @@ def check(name, condition):
     print("PASS: " + name, flush=True)
 
 
+def verify_search(catalogue):
+    catalogue.open("Search Bar")
+    for query, result in (("Cal", "Calendar"), ("Muscle", "Muscle Map"), ("", None)):
+        field = next(n for n in catalogue.nodes() if n.get("class") == "android.widget.EditText")
+        catalogue.tap_node(field)
+        if query:
+            catalogue.run("shell", "input", "text", query)
+            nodes = catalogue.nodes()
+            check("search filters " + query, any(n.get("text") == result for n in nodes)
+                  and not any(n.get("text") == "DynamicList" for n in nodes))
+        # Find the button after filtering: the keyboard changes its screen position.
+        catalogue.tap("Clear search")
+        nodes = catalogue.nodes()
+        field = next(n for n in nodes if n.get("class") == "android.widget.EditText")
+        check("clear restores results for " + repr(query), field.get("text", "") == ""
+              and any(n.get("text") == "DynamicList" for n in nodes))
+        check("clear dismisses focus for " + repr(query), field.get("focused") == "false"
+              and not any(n.get("content-desc") == "Clear search" for n in nodes))
+        keyboard = catalogue.run("shell", "dumpsys", "input_method").decode()
+        check("clear dismisses keyboard for " + repr(query), "mInputShown=false" in keyboard)
+
+
 def verify_dynamic_list(catalogue):
     catalogue.open("DynamicList")
     for axis in ("Horizontal", "Vertical"):
@@ -319,6 +341,7 @@ def verify(catalogue, screenshots):
     catalogue.tap("5 of 5 stars")
     check("rating selection updates binding", catalogue.has_text("Rating: 5.0 / 5"))
 
+    verify_search(catalogue)
     verify_dynamic_list(catalogue)
     verify_integrations(catalogue)
     verify_calendar(catalogue)
