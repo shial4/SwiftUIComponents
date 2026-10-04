@@ -237,6 +237,32 @@ def verify_rating(catalogue):
     check_cells()
 
 
+def verify_counting(catalogue):
+    catalogue.open("Counting Label")
+
+    def settled(target):
+        amount = f"{target / 4:.2f}"
+        expected = {f"Score: {target}", f"Down {100 - target}, up {target}",
+                    f"Paid {amount}, saved {amount}", f"Complete: {target}.0%",
+                    f"Target: {target}"}
+        deadline = time.monotonic() + 10
+        while True:
+            texts = {node.get("text") for node in catalogue.nodes()}
+            if expected <= texts or time.monotonic() >= deadline:
+                break
+            time.sleep(0.2)
+        check(f"counting target {target} updates integers, both directions, decimals and percentage",
+              expected <= texts)
+
+    settled(50)
+    catalogue.tap("Increment")
+    settled(60)
+    catalogue.tap("Decrement")
+    settled(50)
+    catalogue.tap("Decrement")
+    settled(40)
+
+
 def verify_progress(catalogue):
     catalogue.open("Progress")
     check("progress displays its initial percentage", catalogue.has_text("35%"))
@@ -410,6 +436,7 @@ def verify(catalogue, screenshots):
     check("disabled checkbox preserves state", catalogue.has_text("Checked"))
 
     verify_rating(catalogue)
+    verify_counting(catalogue)
     verify_progress(catalogue)
 
     verify_search(catalogue)

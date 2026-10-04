@@ -18,7 +18,7 @@ CLIPS = {
     'muscle-paint': (10, (.105, .98), (.085, .93)),
     'joystick-drag': (8, (.105, .73), (.085, .70)),
     'rating-input': (7, (.105, .76), (.085, .76)),
-    'counting-label': (8, (.105, .76), (.085, .77)),
+    'counting-label': (8, (.105, .83), (.085, .80)),
     'progress': (9, (.105, .64), (.085, .60)),
 }
 
@@ -53,17 +53,20 @@ def compose(ffmpeg, directory, output, name, spec):
     for index, ((duration, _, _), (top, height)) in enumerate(zip(info, crops_px)):
         # Remove recording startup, then align the two complete interactions in
         # time. Source frames remain actual app output; no animation is invented.
-        scale_time = (seconds - .5) / (duration - 1)
+        # Hold the final source frame before sampling variable-rate simulator
+        # recordings. Otherwise a last update between FPS ticks can be dropped.
+        scale_time = (seconds - 1) / duration
         background = 'white' if index == 0 else '0xf9f7ff'
         filters.append(
-            f'[{index}:v]fps=12:eof_action=pass,trim=start=1,'
+            f'[{index}:v]tpad=stop_mode=clone:stop_duration=1,'
+            'fps=12:eof_action=pass,trim=start=1,'
             f'setpts=(PTS-STARTPTS)*{scale_time},crop=iw:{height}:0:{top},'
             f'scale={tile_width}:-2:flags=lanczos,'
             'tpad=stop_mode=clone:stop_duration=1,fps=12,'
             f'pad={tile_width}:{tile_height}:0:0:color={background}[side{index}]')
     filters.extend([
         f'[side0]pad={tile_width + gap}:{tile_height}:0:0:color=0xf4f7fc[left]',
-        f'[left][side1]hstack=inputs=2,'
+        f'[left][side1]hstack=inputs=2,tpad=stop_mode=clone:stop_duration=1,'
         f'pad={canvas_width}:{tile_height + heading + margin}:{margin}:{heading}:color=0xf4f7fc[body]',
         '[body][2:v]overlay=0:0:shortest=1,split[frames][colors]',
         '[colors]palettegen=stats_mode=diff[palette]',

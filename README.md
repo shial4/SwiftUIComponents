@@ -529,11 +529,15 @@ Counts above the maximum display a compact label such as `99+`. Use custom text 
 
 ### CountingLabel
 
-<img src="Documentation/Images/counting-label.gif" alt="iOS and Android recordings: numeric labels count up and down as their targets change" width="680">
+<img src="Documentation/Images/counting-label.gif" alt="iOS and Android recordings: changing one target replays integers, counting down and up, repeated decimals and percentages" width="680">
 
 ```swift
 CountingLabel(from: "Paid 0.00", to: "Paid 12.50", interval: 0.02, format: ["%0.2f"])
+CountingLabel(from: "Down 100, up 0", to: "Down 50, up 50", interval: 0.02)
+CountingLabel(to: "Complete: 50.0%", interval: 0.01, format: ["%0.1f"])
 ```
+
+The playground's target control replays every format together. Pass changing `to` values to animate new targets; each label restarts from its `from` value, or zero when omitted.
 
 CountingLabel matches signed ASCII decimal numbers, pairs them by position and finishes in at most 120 frames. Mismatched number counts display the target immediately. Short format arrays use defaults. It accepts bounded floating-point printf formats (`f`, `e`, `g` and uppercase variants); unsafe formats fall back to `%0.0f`. Tasks cancel on disappearance and restart when inputs change.
 
