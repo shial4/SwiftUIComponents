@@ -3,6 +3,7 @@
 [![Swift tests](https://github.com/shial4/SwiftUIComponents/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/shial4/SwiftUIComponents/actions/workflows/tests.yml)
 [![iOS build](https://github.com/shial4/SwiftUIComponents/actions/workflows/ios.yml/badge.svg?branch=main)](https://github.com/shial4/SwiftUIComponents/actions/workflows/ios.yml)
 [![Android build](https://github.com/shial4/SwiftUIComponents/actions/workflows/android.yml/badge.svg?branch=main)](https://github.com/shial4/SwiftUIComponents/actions/workflows/android.yml)
+[![Release](https://img.shields.io/github/v/release/shial4/SwiftUIComponents)](https://github.com/shial4/SwiftUIComponents/releases/latest)
 
 [![Swift](https://img.shields.io/badge/Swift-6.3%2B-orange?logo=swift)](#requirements)
 [![iOS](https://img.shields.io/badge/iOS-18%2B-blue?logo=apple)](#requirements)
@@ -44,12 +45,12 @@ Swift 6.3 or later.
 
 ## Install
 
-In Xcode, choose **File > Add Package Dependencies**, enter `https://github.com/shial4/SwiftUIComponents.git`, choose **Up to Next Major Version** starting at **1.0.0**, and add the **SwiftUIComponents** library to your target.
+In Xcode, choose **File > Add Package Dependencies**, enter `https://github.com/shial4/SwiftUIComponents.git`, choose **Up to Next Major Version** starting at **1.0.1**, and add the **SwiftUIComponents** library to your target.
 
 Or add the package to `Package.swift`:
 
 ```swift
-.package(url: "https://github.com/shial4/SwiftUIComponents.git", from: "1.0.0")
+.package(url: "https://github.com/shial4/SwiftUIComponents.git", from: "1.0.1")
 ```
 
 Then add its product to your target's dependencies:
@@ -508,10 +509,12 @@ Choose filled or outlined styling. Binding initializers are interactive; Bool in
 Tap a star for a whole rating; drag the slider to see fractional fills.
 
 ```swift
-RatingView(rating: $rating, spacing: 8).foregroundStyle(.orange)
+RatingView(rating: $rating, spacing: 8)
+    .foregroundStyle(.orange)
+    .frame(height: 48)
 ```
 
-Display fractional stars or let the user select a whole-star rating. Set spacing, size and foreground style with ordinary SwiftUI modifiers.
+Display fractional stars or let the user select a whole-star rating. The five square cells fit the available width and height. Set spacing, size and foreground style with ordinary SwiftUI modifiers.
 
 ### Badge
 
@@ -526,7 +529,7 @@ Counts above the maximum display a compact label such as `99+`. Use custom text 
 
 ### CountingLabel
 
-<img src="Documentation/Images/counting-label.png" alt="iOS: Animated numeric labels and formatting controls" width="240"> <img src="Documentation/Images/android-counting-label.png" alt="Android: Animated numeric labels and formatting controls" width="240">
+<img src="Documentation/Images/counting-label.gif" alt="iOS and Android recordings: numeric labels count up and down as their targets change" width="680">
 
 ```swift
 CountingLabel(from: "Paid 0.00", to: "Paid 12.50", interval: 0.02, format: ["%0.2f"])
@@ -536,7 +539,7 @@ CountingLabel matches signed ASCII decimal numbers, pairs them by position and f
 
 ### Progress
 
-<img src="Documentation/Images/progress.png" alt="iOS: Progress drawn around circular and custom shapes" width="240"> <img src="Documentation/Images/android-progress.png" alt="Android: Progress drawn around circular and custom shapes" width="240">
+<img src="Documentation/Images/progress.gif" alt="iOS and Android recordings: circular and custom-shape progress follows a slider and animates to completion" width="680">
 
 ```swift
 SwiftUIComponents.Progress(progress: $progress, content: Circle(), lineWidth: 8)

@@ -1,6 +1,6 @@
 import SwiftUI
 
-public struct MuscleMapVectorPath {
+nonisolated public struct MuscleMapVectorPath: Sendable {
     public struct Builder {
         fileprivate var elements: [Element] = []
 
@@ -21,7 +21,7 @@ public struct MuscleMapVectorPath {
         }
     }
 
-    fileprivate enum Element {
+    fileprivate enum Element: Sendable {
         case move(CGPoint)
         case line(CGPoint)
         case curve(CGPoint, CGPoint, CGPoint)
@@ -36,19 +36,17 @@ public struct MuscleMapVectorPath {
         elements = builder.elements
     }
 
-    fileprivate var swiftUIPath: Path {
-        Path { path in
-            for element in elements {
-                switch element {
-                case .move(let point):
-                    path.move(to: point)
-                case .line(let point):
-                    path.addLine(to: point)
-                case .curve(let point, let control1, let control2):
-                    path.addCurve(to: point, control1: control1, control2: control2)
-                case .close:
-                    path.closeSubpath()
-                }
+    fileprivate func append(to path: inout Path, transform: (CGPoint) -> CGPoint) {
+        for element in elements {
+            switch element {
+            case .move(let point):
+                path.move(to: transform(point))
+            case .line(let point):
+                path.addLine(to: transform(point))
+            case .curve(let point, let control1, let control2):
+                path.addCurve(to: transform(point), control1: transform(control1), control2: transform(control2))
+            case .close:
+                path.closeSubpath()
             }
         }
     }
@@ -97,16 +95,43 @@ public struct MuscleMapVectorPath {
     }
 }
 
-struct MuscleMapHitRegion {
+nonisolated struct MuscleMapHitRegion {
+    private static let edgeTolerance = 0.75
     let polygons: [[CGPoint]]
+    private let bounds: [CGRect]
+
+    init(polygons: [[CGPoint]], bounds: [CGRect]? = nil) {
+        self.polygons = polygons
+        self.bounds = bounds ?? polygons.map(Self.bounds)
+    }
+
+    static func bounds(of polygon: [CGPoint]) -> CGRect {
+        guard let first = polygon.first else { return .null }
+        var minX = first.x, maxX = first.x, minY = first.y, maxY = first.y
+        for point in polygon.dropFirst() {
+            minX = min(minX, point.x)
+            maxX = max(maxX, point.x)
+            minY = min(minY, point.y)
+            maxY = max(maxY, point.y)
+        }
+        return CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+    }
 
     func contains(_ point: CGPoint) -> Bool {
-        polygons.contains { polygonContains(point, polygon: $0) }
+        zip(polygons, bounds).contains { polygon, bounds in
+            point.x >= bounds.minX - Self.edgeTolerance && point.x <= bounds.maxX + Self.edgeTolerance
+                && point.y >= bounds.minY - Self.edgeTolerance && point.y <= bounds.maxY + Self.edgeTolerance
+                && polygonContains(point, polygon: polygon)
+        }
     }
 
     func distance(to point: CGPoint) -> Double {
-        polygons.reduce(Double.greatestFiniteMagnitude) { closest, polygon in
-            min(closest, polygonDistance(point, polygon: polygon))
+        zip(polygons, bounds).reduce(Double.greatestFiniteMagnitude) { closest, item in
+            let (polygon, bounds) = item
+            let dx = max(bounds.minX - point.x, point.x - bounds.maxX, 0)
+            let dy = max(bounds.minY - point.y, point.y - bounds.maxY, 0)
+            guard hypot(dx, dy) < closest else { return closest }
+            return min(closest, polygonDistance(point, polygon: polygon))
         }
     }
 
@@ -116,7 +141,7 @@ struct MuscleMapHitRegion {
         var inside = false
         var previous = polygon[polygon.count - 1]
         for current in polygon {
-            if segmentDistance(point, from: previous, to: current) <= 0.75 {
+            if segmentDistance(point, from: previous, to: current) <= Self.edgeTolerance {
                 return true
             }
 
@@ -164,6 +189,25 @@ struct MuscleMapHitRegion {
     }
 }
 
+/// Built-in vectors are immutable. Flatten their curves once, then scale the
+/// points for drawing and hit testing. Custom MuscleMapShape implementations
+/// keep their existing size-dependent paths contract.
+nonisolated struct MuscleMapGeometry: Sendable {
+    let vectors: [MuscleMapVectorPath]
+    let polygons: [[CGPoint]]
+    let bounds: [CGRect]
+
+    init(_ vectors: [MuscleMapVectorPath]) {
+        self.vectors = vectors
+        self.polygons = vectors.map { $0.flattenedPoints { $0 } }
+        self.bounds = polygons.map(MuscleMapHitRegion.bounds)
+    }
+}
+
+protocol CachedMuscleMapShape: MuscleMapShape {
+    nonisolated static var geometry: MuscleMapGeometry { get }
+}
+
 public protocol MuscleMapShape: Shape {
     nonisolated var translationX: Double { get }
     nonisolated func paths(width: Double, height: Double) -> [MuscleMapVectorPath]
@@ -173,16 +217,18 @@ extension MuscleMapShape {
     nonisolated public func path(in rect: CGRect) -> Path {
         guard rect.width.isFinite, rect.height.isFinite, rect.width > 0, rect.height > 0 else { return Path() }
 
-        let translationXComparison = (translationX.isFinite && abs(translationX) >= 0.01)
-        return path(
-            width: rect.size.width / 10.0,
-            height: rect.size.height / 10.0
-        )
-        .applying(CGAffineTransform(scaleX: 1.0, y: -1.0))
-        .applying(CGAffineTransform(
-            translationX: rect.minX + (translationXComparison ? rect.size.width / translationX : 0.0),
-            y: rect.maxY
-        ))
+        let translation = (translationX.isFinite && abs(translationX) >= 0.01) ? rect.width / translationX : 0
+        let cached = (self as? any CachedMuscleMapShape).map { type(of: $0).geometry }
+        let width = cached == nil ? 1 : rect.width / 10
+        let height = cached == nil ? 1 : rect.height / 10
+        let vectors = cached?.vectors ?? paths(width: rect.width / 10, height: rect.height / 10)
+        return Path { path in
+            for vector in vectors {
+                vector.append(to: &path) { point in
+                    CGPoint(x: rect.minX + point.x * width + translation, y: rect.maxY - point.y * height)
+                }
+            }
+        }
     }
     
     nonisolated public func contains(point: CGPoint, in rect: CGRect) -> Bool {
@@ -190,7 +236,25 @@ extension MuscleMapShape {
     }
 
     nonisolated func hitRegion(in rect: CGRect) -> MuscleMapHitRegion {
+        guard rect.width.isFinite, rect.height.isFinite, rect.width > 0, rect.height > 0 else {
+            return MuscleMapHitRegion(polygons: [])
+        }
         let translation = (translationX.isFinite && abs(translationX) >= 0.01) ? rect.size.width / translationX : 0.0
+        if let cached = self as? any CachedMuscleMapShape {
+            let geometry = type(of: cached).geometry
+            let width = rect.width / 10, height = rect.height / 10
+            let polygons = geometry.polygons.map { polygon in
+                polygon.map { point in
+                    CGPoint(x: rect.minX + point.x * width + translation, y: rect.maxY - point.y * height)
+                }
+            }
+            let bounds = geometry.bounds.map { bounds in
+                CGRect(x: rect.minX + bounds.minX * width + translation,
+                       y: rect.maxY - bounds.maxY * height,
+                       width: bounds.width * width, height: bounds.height * height)
+            }
+            return MuscleMapHitRegion(polygons: polygons, bounds: bounds)
+        }
         let vectors = paths(
             width: rect.size.width / 10.0,
             height: rect.size.height / 10.0
@@ -204,8 +268,8 @@ extension MuscleMapShape {
     
     nonisolated public func path(width: Double, height: Double) -> Path {
         Path { path in
-            paths(width: width, height: height).forEach {
-                path.addPath($0.swiftUIPath)
+            for vector in paths(width: width, height: height) {
+                vector.append(to: &path) { $0 }
             }
         }
     }
@@ -239,7 +303,9 @@ public extension MuscleMapShape {
                 } else {
                     self.fill(style.fillColor)
                 }
-                self.stroke(style.strokeColor, lineWidth: style.lineWidth)
+                if style.lineWidth > 0 {
+                    self.stroke(style.strokeColor, lineWidth: style.lineWidth)
+                }
             }
         }
     }

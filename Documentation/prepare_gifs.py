@@ -17,7 +17,9 @@ CLIPS = {
     'calendar-selection': (10, (.105, .79), (.085, .77)),
     'muscle-paint': (10, (.105, .98), (.085, .93)),
     'joystick-drag': (8, (.105, .73), (.085, .70)),
-    'rating-input': (7, (.105, .68), (.085, .68)),
+    'rating-input': (7, (.105, .76), (.085, .76)),
+    'counting-label': (8, (.105, .76), (.085, .77)),
+    'progress': (9, (.105, .64), (.085, .60)),
 }
 
 
@@ -51,13 +53,13 @@ def compose(ffmpeg, directory, output, name, spec):
     for index, ((duration, _, _), (top, height)) in enumerate(zip(info, crops_px)):
         # Remove recording startup, then align the two complete interactions in
         # time. Source frames remain actual app output; no animation is invented.
-        scale_time = seconds / (duration - 1.2)
+        scale_time = (seconds - .5) / (duration - 1)
         background = 'white' if index == 0 else '0xf9f7ff'
         filters.append(
-            f'[{index}:v]trim=start=1:end={duration - .2},'
+            f'[{index}:v]fps=12:eof_action=pass,trim=start=1,'
             f'setpts=(PTS-STARTPTS)*{scale_time},crop=iw:{height}:0:{top},'
-            f'scale={tile_width}:-2:flags=lanczos,fps=12,'
-            'tpad=stop_mode=clone:stop_duration=1,'
+            f'scale={tile_width}:-2:flags=lanczos,'
+            'tpad=stop_mode=clone:stop_duration=1,fps=12,'
             f'pad={tile_width}:{tile_height}:0:0:color={background}[side{index}]')
     filters.extend([
         f'[side0]pad={tile_width + gap}:{tile_height}:0:0:color=0xf4f7fc[left]',
@@ -92,9 +94,13 @@ def main():
                         help='folder containing ios-<clip>.mov and android-<clip>.mp4')
     parser.add_argument('--ffmpeg', default='ffmpeg')
     parser.add_argument('--output', default=BASE / 'Images', type=Path)
+    parser.add_argument('--only', action='append', choices=CLIPS,
+                        help='compose only the named clip; repeatable')
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     for name, spec in CLIPS.items():
+        if args.only and name not in args.only:
+            continue
         compose(args.ffmpeg, args.recordings, args.output, name, spec)
 
 

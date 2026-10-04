@@ -14,6 +14,10 @@ struct RatingExampleView: View {
             Section("Read-only display") {
                 RatingView(rating: .constant(4.25)).disabled(true).foregroundStyle(.purple).frame(height: 32)
             }
+            Section("Compact width") {
+                RatingView(rating: .constant(2.5)).disabled(true).foregroundStyle(.blue)
+                    .frame(width: 120, height: 24)
+            }
         }
     }
 }

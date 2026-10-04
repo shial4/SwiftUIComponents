@@ -1,10 +1,12 @@
 import SwiftUI
 
 extension MuscleMap.Front {
-    public struct Abdominals: MuscleMapShape {
+    public struct Abdominals: MuscleMapShape, CachedMuscleMapShape {
+        nonisolated static let geometry = MuscleMapGeometry(Abdominals().paths(width: 1, height: 1))
+
         public var translationX: Double
         
-        public init(translationX: Double = 0) {
+        nonisolated public init(translationX: Double = 0) {
             self.translationX = translationX
         }
         

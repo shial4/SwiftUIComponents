@@ -6,7 +6,7 @@ struct ProgressExampleView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
-                Text(progress, format: .percent.precision(.fractionLength(0))).font(.title)
+                Text(verbatim: progress.formatted(.percent.precision(.fractionLength(0)))).font(.title)
                 Slider(value: $progress, in: 0...1) { Text("Progress") }
                 HStack(spacing: 24) {
                     Progress(progress: $progress, content: Circle(), lineWidth: 8)

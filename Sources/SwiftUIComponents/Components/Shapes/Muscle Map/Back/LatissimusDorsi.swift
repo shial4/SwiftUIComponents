@@ -1,10 +1,12 @@
 import SwiftUI
 
 extension MuscleMap.Back {
-    public struct LatissimusDorsi: MuscleMapShape {
+    public struct LatissimusDorsi: MuscleMapShape, CachedMuscleMapShape {
+        nonisolated static let geometry = MuscleMapGeometry(LatissimusDorsi().paths(width: 1, height: 1))
+
         public var translationX: Double
         
-        public init(translationX: Double = 0) {
+        nonisolated public init(translationX: Double = 0) {
             self.translationX = translationX
         }
         

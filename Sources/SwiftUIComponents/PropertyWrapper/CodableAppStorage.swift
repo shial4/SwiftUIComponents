@@ -29,7 +29,7 @@ public struct CodableAppStorage<Value: Codable>: DynamicProperty {
         get { (try? JSONDecoder().decode(Value.self, from: data)) ?? defaultValue }
         nonmutating set {
             guard let encoded = try? JSONEncoder().encode(newValue) else { return }
-            data = encoded
+            if data != encoded { data = encoded }
         }
     }
 

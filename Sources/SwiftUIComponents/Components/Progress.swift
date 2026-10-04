@@ -68,17 +68,16 @@ public struct Progress<Content: Shape>: View {
     }
 
     public var body: some View {
-        ZStack {
+        let value = Self.normalized(progress)
+        return ZStack {
             content
                 .stroke(BackgroundStyle.background, style: style)
             content
-                .trim(from: 0, to: Self.normalized(progress))
+                .trim(from: 0, to: value)
                 .stroke(ForegroundStyle.foreground, style: style)
         }
         .componentAccessibilityChildren(.ignore)
         .accessibilityLabel("Progress")
-        .accessibilityValue(Text(normalizedPercent))
+        .accessibilityValue(Text(verbatim: value.formatted(.percent.precision(.fractionLength(0)))))
     }
-
-    private var normalizedPercent: String { Self.normalized(progress).formatted(.percent.precision(.fractionLength(0))) }
 }

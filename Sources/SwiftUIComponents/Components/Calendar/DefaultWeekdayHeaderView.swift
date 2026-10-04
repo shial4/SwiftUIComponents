@@ -24,14 +24,15 @@ public struct DefaultWeekdaysHeaderView: View {
     }
 
     public var body: some View {
-        HStack {
+        let symbols = calendar.shortWeekdaySymbols
+        return HStack {
             ForEach(weekRange, id: \.self) { index in
-                Text(calendar.shortWeekdaySymbols[index])
+                Text(symbols[index])
                 #if !os(Android)
                     .fontWidth(.compressed)
                 #endif
                     .frame(maxWidth: Double.infinity)
-                    .foregroundColor(headerTextColor)
+                    .foregroundStyle(headerTextColor)
                     .font(Font.system(Font.TextStyle.callout).weight(Font.Weight.light))
                     .lineLimit(1)
             }

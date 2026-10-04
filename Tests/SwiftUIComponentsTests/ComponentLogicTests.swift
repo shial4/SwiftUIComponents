@@ -56,6 +56,24 @@ struct ComponentLogicTests {
         #expect(RatingView.fraction(.nan, forStar: 0) == 0)
     }
 
+    @Test("Five rating cells stay square and inside compact bounds", arguments: [
+        (320.0, 48.0, 8.0), (100.0, 32.0, 2.0), (12.0, 8.0, 20.0),
+        (0.0, 32.0, 2.0), (320.0, 0.0, 2.0), (320.0, 48.0, -2.0)
+    ])
+    func ratingBounds(width: Double, height: Double, spacing: Double) {
+        let layout = RatingLayout(size: CGSize(width: width, height: height), spacing: spacing)
+        #expect(layout.side >= 0 && layout.side <= height)
+        #expect(layout.side * 5 + layout.spacing * 4 <= width + 0.001)
+        if width == 320 && height == 48 { #expect(layout.side == 48) }
+    }
+
+    @Test("Invalid rating dimensions cannot generate invalid frames")
+    func invalidRatingBounds() {
+        let layout = RatingLayout(size: CGSize(width: Double.infinity, height: Double.nan), spacing: .nan)
+        #expect(layout.side == 0)
+        #expect(layout.spacing == 0)
+    }
+
     @MainActor @Test("Progress clamps invalid and out-of-range values", arguments: [(-1.0, 0.0), (0.5, 0.5), (2.0, 1.0), (Double.infinity, 0.0)])
     func progress(input: Double, expected: Double) {
         #expect(SwiftUIComponents.Progress<Circle>.normalized(input) == expected)
@@ -97,7 +115,12 @@ struct ComponentLogicTests {
         #expect(owner.value == 4)
         owner.value = 8
         #expect(binding.wrappedValue == 8)
+        binding.wrappedValue = 8
+        #expect(owner.updates == 2, "Writing the current value does not invalidate its owner")
     }
 }
 
-@MainActor private final class BindingOwner { var value = 1 }
+@MainActor private final class BindingOwner {
+    var updates = 0
+    var value = 1 { didSet { updates += 1 } }
+}

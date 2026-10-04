@@ -17,7 +17,7 @@ public extension View {
     }
 
     func size(onChange size: Binding<CGSize>) -> some View {
-        self.size { size.wrappedValue = $0 }
+        self.size { if size.wrappedValue != $0 { size.wrappedValue = $0 } }
     }
 
     func frame(onChange: @escaping (CGRect) -> Void) -> some View {
@@ -25,6 +25,6 @@ public extension View {
     }
 
     func frame(onChange frame: Binding<CGRect>) -> some View {
-        self.frame { frame.wrappedValue = $0 }
+        self.frame { if frame.wrappedValue != $0 { frame.wrappedValue = $0 } }
     }
 }

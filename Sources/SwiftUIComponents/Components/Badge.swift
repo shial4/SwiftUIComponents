@@ -23,9 +23,11 @@ public struct Badge: ViewModifier {
     public func body(content: Content) -> some View {
         content.overlay(alignment: normalizedAlignment) {
             Text(label)
-                .fixedSize()
+                .lineLimit(1)
                 .padding(.horizontal, 7)
+                .padding(.vertical, 2)
                 .background(color, in: Capsule())
+                .fixedSize()
                 .size(onChange: $labelSize)
                 .offset(x: (normalizedAlignment == .topLeading || normalizedAlignment == .bottomLeading) ? -labelSize.width / 2 : labelSize.width / 2,
                         y: (normalizedAlignment == .topLeading || normalizedAlignment == .topTrailing) ? -labelSize.height / 2 : labelSize.height / 2)

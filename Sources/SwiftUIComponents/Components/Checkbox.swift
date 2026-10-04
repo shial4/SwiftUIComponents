@@ -55,9 +55,7 @@ public struct Checkbox: View {
             HStack {
                 ZStack {
                     if isChecked && isFilled {
-                        RoundedRectangle(cornerRadius: width * 0.125)
-                            .fill(.foreground)
-                            .reverseMask { Tick().fill(.foreground).padding(width * 0.2) }
+                        FilledCheckbox().fill(.foreground, style: FillStyle(eoFill: true))
                     } else {
                         RoundedRectangle(cornerRadius: width * 0.125)
                             .strokeBorder(.foreground, lineWidth: width * 0.125)
@@ -77,5 +75,15 @@ public struct Checkbox: View {
         var view = self
         view.isFilled = false
         return view
+    }
+}
+
+/// One vector fill draws both the box and its cutout, without a mask layer.
+struct FilledCheckbox: Shape {
+    func path(in rect: CGRect) -> Path {
+        let width = min(rect.width, rect.height)
+        var path = RoundedRectangle(cornerRadius: width * 0.125).path(in: rect)
+        path.addPath(Tick().path(in: rect.insetBy(dx: width * 0.2, dy: width * 0.2)))
+        return path
     }
 }

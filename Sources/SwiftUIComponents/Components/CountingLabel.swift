@@ -18,13 +18,15 @@ public struct CountingLabel: View {
     public var body: some View {
         Text(text)
             .task(id: AnimationInput(counter: counter, interval: interval, reduceMotion: reduceMotion)) {
-                text = reduceMotion ? counter.target : counter.initialText
+                let initial = reduceMotion ? counter.target : counter.initialText
+                if text != initial { text = initial }
                 guard !reduceMotion, counter.initialText != counter.target else { return }
                 for frame in 1...counter.frameCount {
                     do { try await Task.sleep(for: .seconds(interval)) }
                     catch { return }
                     guard !Task.isCancelled else { return }
-                    text = counter.text(at: frame)
+                    let next = counter.text(at: frame)
+                    if text != next { text = next }
                 }
             }
     }
@@ -71,7 +73,7 @@ struct CountingText: Equatable, Sendable {
             }
         }
         self.numbers = numbers
-        let steps = numbers.map { abs($0.to - $0.from) / $0.step }.max() ?? 0
+        let steps = numbers.reduce(0.0) { max($0, abs($1.to - $1.from) / $1.step) }
         self.frameCount = Int(min(120, max(1, ceil(steps))))
         if numbers.isEmpty {
             self.initialText = to

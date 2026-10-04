@@ -79,7 +79,12 @@ class Catalogue:
                            and n.get("class") != "android.widget.EditText"), None)
             if target is not None:
                 self.tap_node(target)
-                return
+                for _ in range(4):
+                    nodes = self.nodes()
+                    if any(n.get("text") == demo for n in nodes) and any(n.get("content-desc") == "Back" for n in nodes):
+                        return
+                    time.sleep(0.2)
+                raise AssertionError("Catalogue route did not render: " + demo)
             time.sleep(0.2)
         raise AssertionError("Missing catalogue route: " + demo)
 
@@ -97,6 +102,22 @@ class Catalogue:
 
     def swipe(self, x1, y1, x2, y2, duration=400):
         self.run("shell", "input", "swipe", str(x1), str(y1), str(x2), str(y2), str(duration))
+        time.sleep(0.5)
+
+    def drag(self, x1, y1, x2, y2):
+        # Like the iOS UI test, hold the exact endpoint before lifting. `input
+        # swipe` can deliver that endpoint only as touch-up, after the last move.
+        self.run("shell", "input", "motionevent", "DOWN", str(x1), str(y1))
+        try:
+            time.sleep(0.2)
+            for step in range(1, 13):
+                x = round(x1 + (x2 - x1) * step / 12)
+                y = round(y1 + (y2 - y1) * step / 12)
+                self.run("shell", "input", "motionevent", "MOVE", str(x), str(y))
+                time.sleep(0.045)
+            time.sleep(0.4)
+        finally:
+            self.run("shell", "input", "motionevent", "UP", str(x2), str(y2))
         time.sleep(0.5)
 
 
@@ -187,6 +208,53 @@ def verify_integrations(catalogue):
     check("JSON nil removes the saved selection", catalogue.has_text("No saved selection"))
 
 
+def verify_rating(catalogue):
+    catalogue.open("Rating")
+    density = int(re.findall(r"\d+", catalogue.run("shell", "wm", "density").decode())[-1]) / 160
+
+    def check_cells():
+        for _ in range(4):
+            cells = [n for n in catalogue.nodes() if re.fullmatch(r"[1-5] of 5 stars", n.get("content-desc", ""))]
+            if len(cells) == 15:
+                break
+            time.sleep(0.2)
+        check("rating renders interactive, read-only and compact groups", len(cells) == 15)
+        for group, maximum in enumerate((48, 32, 24)):
+            bounds = [catalogue.bounds(n) for n in cells[group * 5:(group + 1) * 5]]
+            check("rating group " + str(group) + " fits square cell bounds",
+                  all(abs((right - left) - (bottom - top)) <= 1
+                      and 0 < right - left <= maximum * density + 1
+                      for left, top, right, bottom in bounds))
+            check("rating group " + str(group) + " cells do not overlap",
+                  all(first[2] <= second[0] for first, second in zip(bounds, bounds[1:])))
+
+    check_cells()
+    catalogue.tap("5 of 5 stars")
+    check("rating selection updates binding", catalogue.has_text("Rating: 5.0 / 5"))
+    sliders = [n for n in catalogue.nodes() if n.get("class") == "android.widget.SeekBar"]
+    left, top, right, bottom = catalogue.bounds(sliders[1])
+    catalogue.run("shell", "input", "tap", str(right - 2), str((top + bottom) // 2))
+    check_cells()
+
+
+def verify_progress(catalogue):
+    catalogue.open("Progress")
+    check("progress displays its initial percentage", catalogue.has_text("35%"))
+    catalogue.tap("Animate to completion")
+    for _ in range(4):
+        if catalogue.has_text("100%"):
+            break
+        time.sleep(0.2)
+    check("progress percentage reaches completion", catalogue.has_text("100%"))
+    catalogue.tap("Reset")
+    check("progress percentage resets", catalogue.has_text("0%"))
+    slider = next(n for n in catalogue.nodes() if n.get("class") == "android.widget.SeekBar")
+    left, top, right, bottom = catalogue.bounds(slider)
+    catalogue.run("shell", "input", "tap", str((left + right) // 2), str((top + bottom) // 2))
+    percentages = [n.get("text", "") for n in catalogue.nodes() if re.fullmatch(r"\d+%", n.get("text", ""))]
+    check("progress slider updates its percentage", any(40 <= int(p[:-1]) <= 60 for p in percentages))
+
+
 def verify_calendar(catalogue):
     def days(nodes=None):
         return [n for n in (catalogue.nodes() if nodes is None else nodes) if re.match(
@@ -214,7 +282,11 @@ def verify_calendar(catalogue):
     check("standalone day reserves the 24-point gap above the range", abs(gap / density - 24) < 2)
 
     catalogue.open("CalendarContentView")
-    cells = days()
+    for _ in range(4):
+        cells = days()
+        if len(cells) >= 28 and square_cells(cells):
+            break
+        time.sleep(0.2)
     check("monthly calendar shares square cell dimensions", len(cells) >= 28 and square_cells(cells))
     catalogue.tap_node(cells[7])
     check("calendar tap selects one day", catalogue.has_text("Selected days: 1"))
@@ -230,7 +302,7 @@ def verify_calendar(catalogue):
     check("weekly calendar retains seven square cells", len(cells) == 7 and square_cells(cells))
     catalogue.tap("Year")
     settled = False
-    for _ in range(4):
+    for _ in range(8):
         nodes = catalogue.nodes()
         cells = days(nodes)
         edges = {edge for n in nodes if n.get("scrollable") == "true"
@@ -244,7 +316,7 @@ def verify_calendar(catalogue):
     catalogue.open("CalendarContentView")
     catalogue.tap("Year")
     first = last = None
-    for _ in range(4):
+    for _ in range(8):
         cells = days()
         first = next((n for n in cells if re.search(r", 5 January \d{4}$", n.get("content-desc", ""))), None)
         last = next((n for n in cells if re.search(r", 11 February \d{4}$", n.get("content-desc", ""))), None)
@@ -252,7 +324,7 @@ def verify_calendar(catalogue):
             break
         time.sleep(0.2)
     check("year calendar exposes dates across adjacent months", first is not None and last is not None)
-    catalogue.swipe(*center(first), *center(last), duration=900)
+    catalogue.drag(*center(first), *center(last))
     check("calendar drag crosses month boundaries in year mode", catalogue.has_text("Selected days: 38"))
 
 
@@ -337,9 +409,8 @@ def verify(catalogue, screenshots):
     catalogue.tap("Disabled")
     check("disabled checkbox preserves state", catalogue.has_text("Checked"))
 
-    catalogue.open("Rating")
-    catalogue.tap("5 of 5 stars")
-    check("rating selection updates binding", catalogue.has_text("Rating: 5.0 / 5"))
+    verify_rating(catalogue)
+    verify_progress(catalogue)
 
     verify_search(catalogue)
     verify_dynamic_list(catalogue)

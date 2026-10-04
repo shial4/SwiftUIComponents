@@ -29,8 +29,18 @@ public struct CalendarContentView<Day: View>: View {
 
     public var body: some View {
         let periods = displayedPeriods
+        let frames = rowFrames
         return content(periods: periods)
-            .onGeometryChange(for: Double.self, of: { $0.size.width }) { width = $0 }
+            .onGeometryChange(for: Double.self, of: { $0.size.width }) { if width != $0 { width = $0 } }
+            #if !os(tvOS)
+            .simultaneousGesture(DragGesture(minimumDistance: 0, coordinateSpace: .global)
+                .onChanged { value in
+                    guard hypot(value.translation.width, value.translation.height) >= 4 else { return }
+                    // Preserve the touch-down day when the first move crosses a cell.
+                    if selection == nil { extendSelection(at: value.startLocation, periods: periods, frames: frames) }
+                    extendSelection(at: value.location, periods: periods, frames: frames)
+                })
+            #endif
     }
 
     private var displayedPeriods: [CalendarPeriod] {
@@ -91,17 +101,15 @@ public struct CalendarContentView<Day: View>: View {
                         dayCell(date, month: period.month, side: side)
                     }
                 }
-                .onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { rowFrames[id] = $0 }
+                .onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) {
+                    if rowFrames[id] != $0 { rowFrames[id] = $0 }
+                }
                 .onDisappear { rowFrames.removeValue(forKey: id) }
                 .id(id)
             }
         }
         .frame(maxWidth: .infinity)
         .id(period.id)
-        #if !os(tvOS)
-        .simultaneousGesture(DragGesture(minimumDistance: 4, coordinateSpace: .global)
-            .onChanged { extendSelection(at: $0.location, periods: periods) })
-        #endif
     }
 
     private func dayCell(_ date: Date, month: Date, side: Double?) -> some View {
@@ -122,13 +130,13 @@ public struct CalendarContentView<Day: View>: View {
         .accessibilityAddTraits(position == nil ? .componentEmpty : .isSelected)
     }
 
-    private func extendSelection(at point: CGPoint, periods: [CalendarPeriod]) {
+    private func extendSelection(at point: CGPoint, periods: [CalendarPeriod], frames: [CalendarRowID: CGRect]) {
         guard isSelectionEnabled, isMultiselectionEnabled,
               point.x.isFinite, point.y.isFinite else { return }
         let columns = calendar.weekdaySymbols.count
         for period in periods {
             for row in 0..<((period.dates.count + columns - 1) / columns) {
-                guard let frame = rowFrames[CalendarRowID(period: period.id, row: row)],
+                guard let frame = frames[CalendarRowID(period: period.id, row: row)],
                       frame.contains(point), frame.width > 0 else { continue }
                 let column = Int((point.x - frame.minX) / (frame.width / Double(columns)))
                 let index = row * columns + column
