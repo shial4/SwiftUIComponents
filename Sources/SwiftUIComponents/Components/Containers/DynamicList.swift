@@ -272,8 +272,8 @@ public struct DynamicList<Content: View>: View {
     }
     #endif
 
-    /// Reports the visible cell's index, or nil for empty content.
-    /// Native containers choose which visible cell to report near the trailing edge.
+    /// Reports the first visible cell's index, including partially visible cells,
+    /// or nil for empty content.
     public func onVisibleCellChange(_ action: @escaping (Int?) -> Void) -> Self {
         var view = self
         view.visibleCellChange = action
@@ -538,18 +538,21 @@ struct DynamicListLengths: Equatable, Sendable {
 struct DynamicListCellVisibility: ViewModifier {
     let orientation: Orientation
     let action: (Bool) -> Void
+    @Environment(\.displayScale) var displayScale
     @State var isVisible = false
 
     func body(content: Content) -> some View {
         content
-            .onGeometryChange(for: Bool.self) { [orientation] geometry in
+            .onGeometryChange(for: Bool.self) { [orientation, displayScale] geometry in
                 let space = NamedCoordinateSpace.scrollView(axis: orientation == .horizontal ? .horizontal : .vertical)
                 let frame = geometry.frame(in: space)
                 let viewport = geometry.bounds(of: space)?.size ?? .zero
                 let start = orientation == .horizontal ? frame.minX : frame.minY
                 let length = orientation == .horizontal ? frame.width : frame.height
                 let limit = orientation == .horizontal ? viewport.width : viewport.height
-                return length > 0 && min(start + length, limit) - max(start, 0) >= length * 0.1
+                // Include a partial leading cell, but ignore subpixel rounding at
+                // an aligned edge. A percentage threshold skips visible content.
+                return length > 0 && min(start + length, limit) - max(start, 0) >= 1 / displayScale
             } action: { visible in
                 isVisible = visible
                 action(visible)

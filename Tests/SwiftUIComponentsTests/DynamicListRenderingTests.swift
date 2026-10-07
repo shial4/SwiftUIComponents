@@ -9,8 +9,7 @@ import SwiftUI
 import Testing
 @testable import SwiftUIComponents
 
-@MainActor @Suite("DynamicList lazy rendering", .serialized)
-struct DynamicListRenderingTests {
+extension HostedRenderingTests {
     @Test("Large lists defer cell builders during initial layout and distant jumps",
           arguments: [Orientation.horizontal, .vertical], ListRenderingSizing.allCases)
     func boundedConstruction(orientation: Orientation, sizing: ListRenderingSizing) async throws {

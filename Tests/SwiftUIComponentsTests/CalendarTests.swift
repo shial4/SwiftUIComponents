@@ -18,8 +18,7 @@ private func date(_ year: Int, _ month: Int, _ day: Int, hour: Int = 0, calendar
     try #require(calendar.date(from: DateComponents(year: year, month: month, day: day, hour: hour)))
 }
 
-@Suite("Calendar arithmetic and selection")
-struct CalendarTests {
+extension HostedRenderingTests {
     #if os(macOS)
     @MainActor @Test("Scrolling a year does not reconstruct unchanged day views")
     func scrollingDoesNotRebuildDays() async throws {
@@ -99,6 +98,10 @@ struct CalendarTests {
         #expect(pixels[dot + 2] > 200 && pixels[dot] < 100, "The event dot stays inside the first cell")
     }
 
+}
+
+@Suite("Calendar arithmetic and selection")
+struct CalendarTests {
     @Test("Month grids contain every day, aligned to the first weekday", arguments: [1, 2, 3, 7])
     func monthGrid(firstWeekday: Int) throws {
         let calendar = gregorian(firstWeekday: firstWeekday)
@@ -222,6 +225,9 @@ struct CalendarTests {
         #expect(january.timeString(calendar) == "14:00")
     }
 
+}
+
+extension HostedRenderingTests {
     @MainActor @Test("Native ClosedRange bindings remain readable and writable")
     func nativeRangeCompatibility() throws {
         let calendar = gregorian()

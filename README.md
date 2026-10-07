@@ -488,7 +488,7 @@ Each row wraps to the available width and determines its own height. Changing it
 - **Uniform sizing:** add `itemLength: 80`.
 - **Variable sizing:** replace `numberOfItems` with `itemLengths: [60, 100, 80]`.
 - **Programmatic scrolling:** set `scrollToIndex`. Requests are clamped to valid indices and reset to nil after processing.
-- **Scroll observation:** use `.onVisibleCellChange`; empty content reports nil.
+- **Scroll observation:** use `.onVisibleCellChange` for the first visible cell, including a partially visible leading cell; empty content reports nil.
 
 Cells use index identity. For data that can be reordered, use native `ForEach(items)` with stable model IDs. On Android, place the list in a non-scrolling parent such as `VStack`; nesting scroll containers on the same axis is unsupported.
 

@@ -3,8 +3,7 @@ import SwiftUI
 import Testing
 @testable import SwiftUIComponents
 
-@MainActor @Suite("Component rendering")
-struct ComponentRenderingTests {
+extension HostedRenderingTests {
     @Test("Rating fill preserves fractional stars at normal and compact sizes",
           arguments: [0.0, 0.25, 0.5, 2.5, 4.75, 5.0])
     func ratingFill(rating: Double) throws {

@@ -5,8 +5,7 @@ import SwiftUI
 import Testing
 @testable import SwiftUIComponents
 
-@MainActor @Suite("Mounted native scrolling", .serialized)
-struct DynamicListIntegrationTests {
+extension HostedRenderingTests {
     @Test("Initial and external offsets scroll both axes with either sizing mode",
           arguments: [Orientation.horizontal, .vertical], [false, true])
     func boundOffsets(orientation: Orientation, automatic: Bool) async throws {
@@ -220,6 +219,35 @@ struct DynamicListIntegrationTests {
         try await eventually { model.visibleIndex == 0 }
         try await Task.sleep(for: .milliseconds(120))
         #expect(model.visibleChanges == [0, nil, 0])
+    }
+
+    @Test("Visible-cell callbacks include the partially visible leading cell",
+          arguments: [Orientation.horizontal, .vertical], [false, true])
+    func partialLeadingCell(orientation: Orientation, automatic: Bool) async throws {
+        let model = ListState(orientation: orientation)
+        model.indexed = true
+        model.automatic = automatic
+        let window = mount(model)
+        defer { window.close() }
+        let scrollView = try await findScrollView(in: window)
+        try await eventually { model.visibleIndex == 0 && (!automatic || model.sizes[1] != nil) }
+        func length(_ index: Int) throws -> Double {
+            guard automatic else { return 40 }
+            let size = try #require(model.sizes[index])
+            return orientation == .horizontal ? size.width : size.height
+        }
+        let first = try length(0)
+        let second = try length(1)
+        for (offset, expected) in [(first - 2, 0), (first + 2, 1),
+                                   (first + second - 2, 1), (first + second + 2, 2),
+                                   (first - 2, 0)] {
+            let point = orientation == .horizontal ? CGPoint(x: offset, y: 0) : CGPoint(x: 0, y: offset)
+            scrollView.contentView.scroll(to: point)
+            scrollView.reflectScrolledClipView(scrollView.contentView)
+            try await eventually("Offset \(offset): expected leading cell \(expected), reported \(String(describing: model.visibleIndex))") {
+                abs(axisOffset(scrollView, orientation) - offset) < 1 && model.visibleIndex == expected
+            }
+        }
     }
 
     private func mount(_ model: ListState) -> NSWindow {

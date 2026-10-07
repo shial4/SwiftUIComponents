@@ -107,6 +107,18 @@ class Catalogue:
                 return None
         raise AssertionError("Missing DynamicList position")
 
+    def visible_index_matches_cells(self, nodes):
+        # UIAutomator clips cell bounds to their scroll viewport. Compare the
+        # callback against rendered cells, including a partial leading cell.
+        indices = []
+        for node in nodes:
+            match = re.fullmatch(r"dynamic-list-cell-(\d+)", node.get("resource-id", ""))
+            if match:
+                left, top, right, bottom = self.bounds(node)
+                if right > left and bottom > top:
+                    indices.append(int(match.group(1)))
+        return bool(indices) and self.visible_index(nodes) == min(indices)
+
     def wait_for(self, predicate, timeout=5):
         """Wait for rendered state, including native animations, within a deadline."""
         deadline = time.monotonic() + timeout
@@ -221,10 +233,10 @@ def verify_dynamic_list(catalogue):
     catalogue.tap("Start")
     check("repopulated list scrolls", at_index(0))
     catalogue.tap("0")
-    check("list cell taps reach their content action", catalogue.has_text("Selected cell: 0"))
+    check("list cell taps reach their content action", catalogue.has_text("Last tapped cell: 0"))
     for sizing in ("Uniform", "Variable"):
         catalogue.tap(sizing)
-        check(sizing + " sizing preserves the selected cell", catalogue.has_text("Selected cell: 0"))
+        check(sizing + " sizing preserves the selected cell", catalogue.has_text("Last tapped cell: 0"))
         catalogue.tap("Start")
         catalogue.tap("Advance 3 cells")
         check(sizing + " explicit lengths scroll by cell ID", at_index(3))
@@ -248,11 +260,12 @@ def verify_dynamic_list_long_jumps(catalogue):
             for command, target in (("Start", 0), ("End", 9999), ("Middle", 5000), ("End", 9999), ("Start", 0)):
                 catalogue.tap(command)
                 check(f"{axis} {sizing} long jump to {target}",
-                      catalogue.wait_for(lambda nodes: cell(nodes, target) is not None, timeout=20))
+                      catalogue.wait_for(lambda nodes: cell(nodes, target) is not None
+                                          and catalogue.visible_index_matches_cells(nodes), timeout=20))
                 catalogue.tap_node(cell(catalogue.nodes(), target))
                 check(f"{axis} {sizing} target {target} remains interactive",
                       catalogue.wait_for(lambda nodes: any(n.get("text", "").replace(",", "")
-                                                           == f"Selected cell: {target}" for n in nodes)))
+                                                           == f"Last tapped cell: {target}" for n in nodes)))
             catalogue.tap("Middle")
             check(f"{axis} {sizing} returns to the middle", catalogue.wait_for(lambda nodes: cell(nodes, 5000) is not None, timeout=20))
             nodes = catalogue.nodes()
@@ -265,7 +278,8 @@ def verify_dynamic_list_long_jumps(catalogue):
                 catalogue.swipe(540, top + 30, 540, bottom - 30)
             check(f"{axis} {sizing} native drag after a long jump",
                   catalogue.wait_for(lambda nodes: catalogue.visible_index(nodes) is not None
-                                      and catalogue.visible_index(nodes) < before))
+                                      and catalogue.visible_index(nodes) < before
+                                      and catalogue.visible_index_matches_cells(nodes)))
 
 
 def verify_integrations(catalogue):

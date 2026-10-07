@@ -4,8 +4,7 @@ import SwiftUI
 import Testing
 @testable import ComponentCatalog
 
-@MainActor @Suite("Executable component catalogue", .serialized)
-struct ComponentCatalogTests {
+extension HostedRenderingTests {
     private var root: URL {
         URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     }

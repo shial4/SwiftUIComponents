@@ -36,10 +36,12 @@ let package = Package(
         .executableTarget(name: "ComponentCatalogRunner", dependencies: ["ComponentCatalog"], path: "Examples/Launcher"),
         .testTarget(
             name: "SwiftUIComponentsTests",
-            dependencies: ["SwiftUIComponents"],
+            dependencies: [
+                "SwiftUIComponents",
+                .target(name: "ComponentCatalog", condition: .when(platforms: [.macOS])),
+            ],
             exclude: ["Skip"]
         ),
-        .testTarget(name: "ComponentCatalogTests", dependencies: ["ComponentCatalog"]),
     ],
     swiftLanguageModes: [.v6]
 )

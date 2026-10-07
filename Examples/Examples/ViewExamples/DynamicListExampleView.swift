@@ -49,7 +49,7 @@ struct DynamicListExampleView: View {
                 .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
                 Text(visibleIndex.map { "Visible cell: \($0)" } ?? "No visible cell")
                     .font(.system(.body, design: .monospaced))
-                Text(selected.map { "Selected cell: \($0)" } ?? "Select a cell")
+                Text(selected.map { "Last tapped cell: \($0)" } ?? "Tap a cell")
                 HStack {
                     Button("Start") { withAnimation { scrollToIndex = 0 } }
                     Button("Advance 3 cells") { withAnimation { scrollToIndex = min(count - 1, (visibleIndex ?? 0) + 3) } }
