@@ -113,7 +113,8 @@ public struct MuscleMap: View {
         var closestSmallMuscle: (structure: MuscleMap.Structure, score: Double)?
 
         for target in targets where target.structure == .teresMajor || target.structure == .infraspinatus {
-            let score = target.region.contains(location) ? 0.0 : target.region.distance(to: location)
+            let score = target.region.contains(location) ? 0.0
+                : target.region.distance(to: location, maximum: min(smallMusclePadding, closestSmallMuscle?.score ?? .infinity))
             if score <= smallMusclePadding,
                score < (closestSmallMuscle?.score ?? .infinity) {
                 closestSmallMuscle = (target.structure, score)
@@ -130,7 +131,7 @@ public struct MuscleMap: View {
         let generalPadding = max(3.0, min(size.width, size.height) * 0.016)
         var closestTarget: (structure: MuscleMap.Structure, distance: Double)?
         for target in targets {
-            let distance = target.region.distance(to: location)
+            let distance = target.region.distance(to: location, maximum: min(generalPadding, closestTarget?.distance ?? .infinity))
             if distance <= generalPadding,
                distance < (closestTarget?.distance ?? .infinity) {
                 closestTarget = (target.structure, distance)

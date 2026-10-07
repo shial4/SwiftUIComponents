@@ -4,6 +4,8 @@ import SwiftUI
 /// the visible grip is constrained to the control's circular travel area.
 public struct JoystickView: View {
     @Binding public var translation: CGPoint
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
+    @State var isDragging = false
     private var gripColor: Color = .white
     private var controlColor: Color = .black
 
@@ -21,6 +23,8 @@ public struct JoystickView: View {
                         .overlay(Circle().stroke(controlColor, lineWidth: 1))
                         .frame(width: diameter / 2, height: diameter / 2)
                         .offset(x: grip.x, y: grip.y)
+                        .animation(!isDragging && translation == .zero && !reduceMotion
+                                   ? .spring(response: 0.35, dampingFraction: 0.75) : nil, value: grip)
                 }
                 .componentHitArea(Circle())
                 #if os(tvOS)
@@ -34,16 +38,24 @@ public struct JoystickView: View {
                     @unknown default: break
                     }
                 }
-                .onExitCommand { translation = .zero }
+                .onExitCommand { reset() }
                 #else
                 .gesture(DragGesture()
-                    .onChanged { translation = CGPoint(x: $0.translation.width, y: $0.translation.height) }
-                    .onEnded { _ in translation = .zero })
+                    .onChanged {
+                        if !isDragging { isDragging = true }
+                        translation = CGPoint(x: $0.translation.width, y: $0.translation.height)
+                    }
+                    .onEnded { _ in reset() })
                 #endif
         }
         .aspectRatio(1, contentMode: .fit)
         .accessibilityLabel("Joystick")
         .accessibilityValue("Horizontal \(translation.x), vertical \(translation.y)")
+    }
+
+    private func reset() {
+        isDragging = false
+        translation = .zero
     }
 
     static func constrained(_ point: CGPoint, radius: Double) -> CGPoint {

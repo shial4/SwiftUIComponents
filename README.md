@@ -45,12 +45,12 @@ Swift 6.3 or later.
 
 ## Install
 
-In Xcode, choose **File > Add Package Dependencies**, enter `https://github.com/shial4/SwiftUIComponents.git`, choose **Up to Next Major Version** starting at **1.0.1**, and add the **SwiftUIComponents** library to your target.
+In Xcode, choose **File > Add Package Dependencies**, enter `https://github.com/shial4/SwiftUIComponents.git`, choose **Up to Next Major Version** starting at **1.0.2**, and add the **SwiftUIComponents** library to your target.
 
 Or add the package to `Package.swift`:
 
 ```swift
-.package(url: "https://github.com/shial4/SwiftUIComponents.git", from: "1.0.1")
+.package(url: "https://github.com/shial4/SwiftUIComponents.git", from: "1.0.2")
 ```
 
 Then add its product to your target's dependencies:
@@ -83,7 +83,7 @@ Explore 84 playgrounds in the [example app](#run-the-examples). Screenshots and 
 | --- | --- | --- |
 | [Muscle Map](#muscle-map) | Regions, styles, taps and drag painting | [Example](Examples/Examples/ViewExamples/MuscleMapExampleView.swift) |
 | [Calendar](#calendar) | Week, month and year; selection and custom cells | [Example](Examples/Examples/ViewExamples/CalendarExampleView.swift) |
-| [DynamicList](#dynamiclist) | Automatic sizing and native scrolling on either axis | [Example](Examples/Examples/ViewExamples/DynamicListExampleView.swift) |
+| [DynamicList](#dynamiclist) | Lazy cell content, automatic sizing and native scrolling on either axis | [Example](Examples/Examples/ViewExamples/DynamicListExampleView.swift) |
 | [Checkbox](#checkbox) | Filled, outlined, labeled and disabled states | [Example](Examples/Examples/ViewExamples/CheckboxExampleView.swift) |
 | [RatingView](#ratingview) | Fractional display and star selection | [Example](Examples/Examples/ViewExamples/RatingExampleView.swift) |
 | [Badge](#badge) | Counts, text, colors and placement | [Example](Examples/Examples/ViewExamples/BadgeExampleView.swift) |
@@ -443,7 +443,7 @@ Implement `CalendarColorSet` to supply your own today, weekend, weekday, selecti
 
 <img src="Documentation/Images/dynamic-list.gif" alt="iOS and Android recordings: cells grow with their content, scroll by index and by dragging, and switch between horizontal and vertical layouts" width="680">
 
-Add content and watch cells resize automatically. Scroll by index or drag, then switch axes.
+Cell content is built on demand. Native lazy stacks handle scrolling and prefetching on either axis, while cells resize to fit their content.
 
 ```swift
 struct ListScreen: View {
@@ -461,7 +461,9 @@ struct ListScreen: View {
             .onVisibleCellChange { visibleIndex = $0 }
             .frame(height: 80)
             Button("Advance") {
-                withAnimation { scrollToIndex = min(99, (visibleIndex ?? 0) + 3) }
+                withAnimation(.easeOut) {
+                    scrollToIndex = min(99, (visibleIndex ?? 0) + 3)
+                }
             }
         }
     }
@@ -490,6 +492,10 @@ Each row wraps to the available width and determines its own height. Changing it
 
 Cells use index identity. For data that can be reordered, use native `ForEach(items)` with stable model IDs. On Android, place the list in a non-scrolling parent such as `VStack`; nesting scroll containers on the same axis is unsupported.
 
+**Large jumps:** on Apple platforms, distant requests first resolve a small range near the destination. Wrap the request in `withAnimation` to animate the final approach using the caller's animation. Immediate requests use the same bounded path without animation. The list checks that the destination stays visible as lazy size estimates settle. Visibility reports update after layout, without briefly reporting an empty list during a jump. New requests, data removal and native dragging cancel pending corrections. The [rendering tests](Tests/SwiftUIComponentsTests/DynamicListRenderingTests.swift) check stable target visibility, distinct callbacks and bounded cell construction in 10,000-cell lists on both axes.
+
+**Android timing:** Skip currently controls the native scroll animation. Large animated jumps can take several seconds, and the caller's duration and curve are not forwarded. That renderer limitation remains separate from the Apple jump fix; see [platform behavior](Android/README.md#platform-behavior). The example includes a **Use 10,000 cells** button to try distant jumps.
+
 The `scrollOffset: Binding<Double>` overloads are Apple-only, with zero at the leading edge and negative values toward the trailing edge. Use `scrollToIndex` for shared code.
 
 ### Checkbox
@@ -514,7 +520,7 @@ RatingView(rating: $rating, spacing: 8)
     .frame(height: 48)
 ```
 
-Display fractional stars or let the user select a whole-star rating. The five square cells fit the available width and height. Set spacing, size and foreground style with ordinary SwiftUI modifiers.
+Display fractional stars or let the user select a whole-star rating. The five square cells fit the available width and height. Set spacing, size and foreground style with ordinary SwiftUI modifiers. Wrap programmatic rating changes in `withAnimation` to animate the fill on iOS and Android.
 
 ### Badge
 
@@ -556,7 +562,7 @@ Use any Shape, including the supplied Star and Triangle. Choose a line width or 
 
 ### JoystickView
 
-<img src="Documentation/Images/joystick-drag.gif" alt="iOS and Android recordings: drag the joystick in several directions, observe the bound coordinates, and release to return to the center" width="680">
+<img src="Documentation/Images/joystick-drag.gif" alt="iOS and Android recordings: drag the joystick in several directions, observe the bound coordinates, and release to spring back to the center" width="680">
 
 Drag in any direction. The bound coordinates update during the gesture and reset on release.
 
@@ -566,7 +572,7 @@ JoystickView(translation: $translation)
     .frame(width: 180, height: 180)
 ```
 
-Reports raw drag distance in points and returns to zero on release. The visible grip stays inside the control. tvOS supports directional remote commands and Exit to reset.
+Reports raw drag distance in points and resets the binding to zero on release. The visible grip stays inside the control and springs back to center, respecting Reduce Motion. tvOS supports directional remote commands and Exit to reset.
 
 ### SearchBar
 

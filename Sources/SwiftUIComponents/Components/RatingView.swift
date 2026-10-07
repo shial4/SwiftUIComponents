@@ -26,8 +26,15 @@ public struct RatingView: View {
                     } label: {
                         Star().stroke(.foreground)
                             .overlay {
-                                Star().fill(.foreground)
-                                    .clipShape(RatingFillClip(fraction: Self.fraction(rating, forStar: index)))
+                                // A trimmed stroke reveals the fill using the same native
+                                // animation path as Progress, including on Skip Fuse.
+                                Path {
+                                    $0.move(to: CGPoint(x: 0, y: layout.side / 2))
+                                    $0.addLine(to: CGPoint(x: layout.side, y: layout.side / 2))
+                                }
+                                .trim(from: 0, to: Self.fraction(rating, forStar: index))
+                                .stroke(.foreground, lineWidth: layout.side)
+                                .clipShape(Star())
                             }
                             .frame(width: layout.side, height: layout.side)
                             .componentHitArea(Rectangle())
@@ -55,17 +62,5 @@ struct RatingLayout: Equatable, Sendable {
         let height = size.height.isFinite ? max(0, size.height) : 0
         self.spacing = min(width / 4, spacing.isFinite ? max(0, spacing) : 2)
         self.side = min(height, max(0, (width - self.spacing * 4) / 5))
-    }
-}
-
-/// Shapes receive their bounds directly from layout, so each star needs no size reader.
-private struct RatingFillClip: Shape {
-    var fraction: Double
-    var animatableData: Double {
-        get { fraction }
-        set { fraction = newValue }
-    }
-    func path(in rect: CGRect) -> Path {
-        Path(CGRect(x: rect.minX, y: rect.minY, width: rect.width * fraction, height: rect.height))
     }
 }

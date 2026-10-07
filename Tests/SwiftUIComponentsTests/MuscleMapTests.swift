@@ -47,6 +47,8 @@ struct MuscleMapTests {
         let targets = MuscleMap.Front().hitTargets(in: rect) + MuscleMap.Back().hitTargets(in: rect)
         #expect(Set(targets.map(\.structure)) == Set(MuscleMap.Structure.allCases))
         #expect(targets.allSatisfy { !$0.region.polygons.isEmpty })
+        let back = MuscleMap.Back().hitTargets(in: rect).map(\.structure)
+        #expect(Set(back).count == back.count, "A structure should not repeat in one side's hit targets")
     }
 
     private func polygon(_ x: Double, _ y: Double, _ size: Double) -> [CGPoint] {

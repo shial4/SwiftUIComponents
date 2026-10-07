@@ -11,6 +11,8 @@ public extension View {
             Rectangle()
                 .overlay(alignment: alignment) {
                     mask()
+                        // Keep translated mask content inside the compositing layer.
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: alignment)
                         .blendMode(BlendMode.destinationOut)
                 }
         }

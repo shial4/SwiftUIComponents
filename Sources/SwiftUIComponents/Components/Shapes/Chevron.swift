@@ -3,7 +3,12 @@ import SwiftUI
 /// A shape representing a chevron.
 public struct Chevron: Shape {
     /// The thickness of the chevron as a fraction of the minimum dimension of the containing rect.
-    public let thickness: Double
+    public var thickness: Double
+
+    public var animatableData: Double {
+        get { thickness }
+        set { thickness = newValue }
+    }
 
     /// Creates a chevron shape with the specified thickness.
     /// - Parameter thickness: The thickness of the chevron as a fraction of the minimum dimension of the containing rect. Default value is 0.25.

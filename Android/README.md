@@ -38,7 +38,7 @@ With the debug APK installed and adb on PATH:
 python3 Android/verify_catalog.py --serial emulator-5554
 ```
 
-This opens all 84 routes, checks Muscle Map tapping and drag painting, calendar sizing and selection in week/month/year modes, key-path and JSON integrations, checkbox and rating bindings, automatic and explicit list sizing, both axes, cell-ID navigation and shrinking/empty lists, and two storage readers before and after a process restart. The script resets the example preferences to their defaults. Add `--screenshots Documentation/Images` to capture each Android demo for the README.
+This opens all 84 routes, checks Muscle Map tapping and drag painting, calendar sizing and selection in week/month/year modes, key-path and JSON integrations, checkbox and rating bindings, automatic and explicit list sizing, both axes, cell-ID navigation and shrinking/empty lists, 10,000-cell jumps and cell selection after arrival, and two storage readers before and after a process restart. The script resets the example preferences to their defaults. Add `--screenshots Documentation/Images` to capture each Android demo for the README.
 
 ## Platform behavior
 
@@ -47,10 +47,15 @@ Typography, native controls, scrolling and accessibility grouping follow each pl
 | API | Apple | Android |
 | --- | --- | --- |
 | DynamicList | Cell-ID scrolling and point-offset overloads | Cell-ID scrolling |
+| DynamicList scroll animation | Caller animation; distant jumps animate only the final approach | Native animation; distant jumps can take several seconds, and caller duration and curve are not forwarded |
 | StackView axis changes | AnyLayout retains child state | HStack/VStack branches can reset child state |
 | FrameModifier | Custom Animatable interpolation | Native modifier animations |
+| Chevron/Tick thickness and RoundedCorner radius | Interpolate with caller animation | Final geometry updates; custom Shape interpolation is not bridged |
+| Checkbox checked-state changes | Caller animation can crossfade the indicator | Indicator updates immediately |
 | Transform transition | Translation, rotation and independent scales | Translation and uniform scale |
 | Muscle Map accessibility | Named selection actions | Shared region toggles and Compose semantics |
 | Codable storage | UserDefaults | SharedPreferences through AndroidUserDefaults |
 
 The `CodableStorage` alias supplies the platform store type for `store:`. Font compression in weekday headers and Xcode previews are Apple-only.
+
+Rating fills and Progress use native trim animations on both platforms. Joystick return uses a value-driven spring. These do not require custom Shape interpolation. The interpolation limitation above was reproduced with SkipFuseUI 1.19.0 and SkipUI 1.61.0; changing a Star's point count or a Triangle's direction is discrete on both platforms.

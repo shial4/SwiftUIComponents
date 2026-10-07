@@ -4,6 +4,40 @@ import Testing
 
 @Suite("Shape geometry")
 struct ShapeTests {
+    @Test("Continuous shape dimensions interpolate through the Shape contract")
+    func continuousShapeAnimation() {
+        func midpoint<S: Shape>(_ start: S, _ end: S) -> S {
+            var result = start
+            var change = end.animatableData - start.animatableData
+            change.scale(by: 0.5)
+            result.animatableData += change
+            return result
+        }
+
+        #expect(abs(midpoint(Chevron(thickness: 0.1), Chevron(thickness: 0.4)).thickness - 0.25) < 0.000001)
+        #expect(abs(midpoint(Tick(thickness: 0.1), Tick(thickness: 0.4)).thickness - 0.25) < 0.000001)
+        let corner = midpoint(RoundedCorner(radius: 0, corners: [.topLeft]),
+                              RoundedCorner(radius: 40, corners: [.topLeft]))
+        #expect(corner.radius == 20)
+        #expect(corner.corners == [.topLeft])
+    }
+
+    @Test("Bounded hit distances preserve corners, edges and disjoint polygons")
+    func boundedHitDistances() {
+        let region = MuscleMapHitRegion(polygons: [
+            [CGPoint(x: 0, y: 0), CGPoint(x: 10, y: 0), CGPoint(x: 10, y: 10), CGPoint(x: 0, y: 10)],
+            [CGPoint(x: 100, y: 100), CGPoint(x: 110, y: 100), CGPoint(x: 110, y: 110), CGPoint(x: 100, y: 110)]
+        ])
+        #expect(region.distance(to: CGPoint(x: 13, y: 14), maximum: 5) == 5)
+        #expect(region.distance(to: CGPoint(x: 13, y: 14), maximum: 4.99) > 4.99)
+        #expect(region.distance(to: CGPoint(x: 113, y: 105), maximum: 3) == 3)
+        #expect(region.distance(to: CGPoint(x: 10, y: 5), maximum: 0) == 0)
+        #expect(region.distance(to: CGPoint(x: 50, y: 50), maximum: 5) > 5)
+        let point = MuscleMapHitRegion(polygons: [[CGPoint(x: 1, y: 1)]])
+        #expect(point.distance(to: CGPoint(x: 4, y: 5)) == 5)
+        #expect(!point.contains(CGPoint(x: 1, y: 1)))
+    }
+
     @Test("Hit-region bounds retain inclusive edge tolerance")
     func hitRegionEdges() {
         let region = MuscleMapHitRegion(polygons: [[

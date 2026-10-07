@@ -90,7 +90,6 @@ extension MuscleMap {
                 (MuscleMap.Back.Hamstrings(translationX: translationX), .hamstrings),
                 (MuscleMap.Back.Calves(translationX: translationX), .calves),
                 (MuscleMap.Back.Foot(translationX: translationX), .tibiaAndFoot),
-                (MuscleMap.Back.Head(translationX: translationX), .head),
                 (MuscleMap.Back.Contour(translationX: translationX), .contour),
             ]
 
@@ -107,15 +106,11 @@ extension MuscleMap {
             guard let structure = structure(at: location, in: rect) else {
                 return
             }
-            onSelect(structure)
+            structureSelect(structure)
         }
         
         private func configuration(_ structure: MuscleMap.Structure) -> MuscleMap.Style {
             return styleRequest(structure) ?? MuscleMap.Style()
-        }
-        
-        private func onSelect(_ structure: MuscleMap.Structure) {
-            structureSelect(structure)
         }
         
         // MARK: Modifiers

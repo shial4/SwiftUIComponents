@@ -184,13 +184,13 @@ struct DynamicListIntegrationTests {
         let window = mount(model)
         defer { window.close() }
         let scrollView = try await findScrollView(in: window)
-        try await eventually("Initial index: \(String(describing: model.index)), offset: \(axisOffset(scrollView, orientation))") {
+        try await eventually("Initial index: \(String(describing: model.index)), visible: \(String(describing: model.visibleIndex)), offset: \(axisOffset(scrollView, orientation))") {
             axisOffset(scrollView, orientation) > 0 && model.visibleIndex == 5 && model.index == nil
         }
         model.index = 12
         try await eventually("Requested 12: index=\(String(describing: model.index)), offset=\(axisOffset(scrollView, orientation)), appeared=\(model.appeared)") { model.visibleIndex == 12 && model.index == nil && model.appeared.contains(12) }
         model.index = 0
-        try await eventually("Requested start: index=\(String(describing: model.index)), offset=\(axisOffset(scrollView, orientation))") { abs(axisOffset(scrollView, orientation)) < 1 && model.visibleIndex == 0 && model.index == nil }
+        try await eventually("Requested start: index=\(String(describing: model.index)), visible=\(String(describing: model.visibleIndex)), offset=\(axisOffset(scrollView, orientation)), changes=\(model.visibleChanges)") { abs(axisOffset(scrollView, orientation)) < 1 && model.visibleIndex == 0 && model.index == nil }
         if automatic {
             model.expanded = true
             try await eventually { model.sizes.values.contains { $0.height > 80 } }
@@ -199,17 +199,27 @@ struct DynamicListIntegrationTests {
         try await eventually("Empty indexed content: index=\(String(describing: model.index)), offset=\(axisOffset(scrollView, orientation))") { model.visibleIndex == nil && model.index == nil && abs(axisOffset(scrollView, orientation)) < 1 }
     }
 
-    @Test("Shared cell-ID lists keep large collections lazy")
-    func indexedLazyCells() async throws {
-        let model = ListState(orientation: .vertical)
+    @Test("Visible-cell callbacks track initial and repopulated content without duplicates",
+          arguments: [Orientation.horizontal, .vertical], [false, true])
+    func distinctVisibleCells(orientation: Orientation, automatic: Bool) async throws {
+        let model = ListState(orientation: orientation)
         model.indexed = true
-        model.automatic = true
-        model.count = 10_000
+        model.automatic = automatic
         let window = mount(model)
         defer { window.close() }
         _ = try await findScrollView(in: window)
-        try await eventually { !model.appeared.isEmpty }
-        #expect(model.appeared.count < 100)
+        try await eventually { model.visibleIndex == 0 && model.index == nil }
+        model.index = 0
+        try await eventually { model.index == nil }
+        model.count = 0
+        try await eventually { model.visibleIndex == nil }
+        // Let the native position binding finish reacting to removed cells.
+        try await Task.sleep(for: .milliseconds(120))
+        #expect(model.visibleChanges == [0, nil])
+        model.count = 30
+        try await eventually { model.visibleIndex == 0 }
+        try await Task.sleep(for: .milliseconds(120))
+        #expect(model.visibleChanges == [0, nil, 0])
     }
 
     private func mount(_ model: ListState) -> NSWindow {
@@ -263,6 +273,11 @@ struct DynamicListIntegrationTests {
     var expanded = false
     @ObservationIgnored var appeared: Set<Int> = []
     @ObservationIgnored var sizes: [Int: CGSize] = [:]
+    @ObservationIgnored var visibleChanges: [Int?] = []
+    func recordVisibleCell(_ index: Int?) {
+        visibleChanges.append(index)
+        visibleIndex = index
+    }
     init(orientation: Orientation, offset: Double = 0) {
         self.orientation = orientation
         self.offset = offset
@@ -277,17 +292,17 @@ private struct ListHarness: View {
                 if model.automatic {
                     DynamicList(scrollToIndex: $model.index, orientation: model.orientation,
                                 numberOfItems: model.count) { automaticCell($0) }
-                        .onVisibleCellChange { model.visibleIndex = $0 }
+                        .onVisibleCellChange(model.recordVisibleCell)
                 } else {
                     DynamicList(scrollToIndex: $model.index, orientation: model.orientation,
                                 numberOfItems: model.count, itemLength: 40) { cell($0) }
-                        .onVisibleCellChange { model.visibleIndex = $0 }
+                        .onVisibleCellChange(model.recordVisibleCell)
                 }
             } else if model.automatic {
                 if model.observesOffset {
                     DynamicList(scrollOffset: $model.offset, orientation: model.orientation,
                                 numberOfItems: model.count) { automaticCell($0) }
-                        .onVisibleCellChange { model.visibleIndex = $0 }
+                        .onVisibleCellChange(model.recordVisibleCell)
                 } else {
                     DynamicList(orientation: model.orientation, numberOfItems: model.count) { automaticCell($0) }
                 }

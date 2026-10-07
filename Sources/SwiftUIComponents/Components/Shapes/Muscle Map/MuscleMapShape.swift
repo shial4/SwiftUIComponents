@@ -125,12 +125,13 @@ nonisolated struct MuscleMapHitRegion {
         }
     }
 
-    func distance(to point: CGPoint) -> Double {
+    /// Only polygons that can fall within `maximum` need an edge walk.
+    func distance(to point: CGPoint, maximum: Double = .greatestFiniteMagnitude) -> Double {
         zip(polygons, bounds).reduce(Double.greatestFiniteMagnitude) { closest, item in
             let (polygon, bounds) = item
             let dx = max(bounds.minX - point.x, point.x - bounds.maxX, 0)
             let dy = max(bounds.minY - point.y, point.y - bounds.maxY, 0)
-            guard hypot(dx, dy) < closest else { return closest }
+            guard hypot(dx, dy) <= min(closest, maximum) else { return closest }
             return min(closest, polygonDistance(point, polygon: polygon))
         }
     }
@@ -141,7 +142,7 @@ nonisolated struct MuscleMapHitRegion {
         var inside = false
         var previous = polygon[polygon.count - 1]
         for current in polygon {
-            if segmentDistance(point, from: previous, to: current) <= Self.edgeTolerance {
+            if segmentDistanceSquared(point, from: previous, to: current) <= Self.edgeTolerance * Self.edgeTolerance {
                 return true
             }
 
@@ -164,20 +165,20 @@ nonisolated struct MuscleMapHitRegion {
         var closest = Double.greatestFiniteMagnitude
         var previous = polygon[polygon.count - 1]
         for current in polygon {
-            closest = min(closest, segmentDistance(point, from: previous, to: current))
+            closest = min(closest, segmentDistanceSquared(point, from: previous, to: current))
             previous = current
         }
-        return closest
+        return closest.squareRoot()
     }
 
-    private func segmentDistance(_ point: CGPoint, from start: CGPoint, to end: CGPoint) -> Double {
+    private func segmentDistanceSquared(_ point: CGPoint, from start: CGPoint, to end: CGPoint) -> Double {
         let dx = end.x - start.x
         let dy = end.y - start.y
         let lengthSquared = dx * dx + dy * dy
         guard lengthSquared > 0 else {
             let pointDX = point.x - start.x
             let pointDY = point.y - start.y
-            return (pointDX * pointDX + pointDY * pointDY).squareRoot()
+            return pointDX * pointDX + pointDY * pointDY
         }
 
         let projection = max(0.0, min(1.0, ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared))
@@ -185,7 +186,7 @@ nonisolated struct MuscleMapHitRegion {
         let projectedY = start.y + projection * dy
         let pointDX = point.x - projectedX
         let pointDY = point.y - projectedY
-        return (pointDX * pointDX + pointDY * pointDY).squareRoot()
+        return pointDX * pointDX + pointDY * pointDY
     }
 }
 

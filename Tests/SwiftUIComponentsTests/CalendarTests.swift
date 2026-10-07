@@ -1,6 +1,9 @@
 import Foundation
 import Testing
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 @testable import SwiftUIComponents
 
 private func gregorian(_ zone: String = "UTC", firstWeekday: Int = 2) -> Calendar {
@@ -17,6 +20,46 @@ private func date(_ year: Int, _ month: Int, _ day: Int, hour: Int = 0, calendar
 
 @Suite("Calendar arithmetic and selection")
 struct CalendarTests {
+    #if os(macOS)
+    @MainActor @Test("Scrolling a year does not reconstruct unchanged day views")
+    func scrollingDoesNotRebuildDays() async throws {
+        _ = NSApplication.shared
+        let calendar = gregorian()
+        let preview = try date(2026, 1, 1, calendar: calendar)
+        var dayBuilds = 0
+        let content = ScrollView {
+            CalendarContentView(type: .yearly(3), selection: .constant(nil as TimeRange?),
+                                previewDate: preview, calendar: calendar) { date, calendar, _, _ in
+                dayBuilds += 1
+                return Text(String(calendar.component(.day, from: date)))
+            }.frame(width: 600)
+        }.frame(width: 600, height: 400)
+        let window = NSWindow(contentRect: CGRect(x: -2000, y: -2000, width: 600, height: 400),
+                              styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = NSHostingView(rootView: content)
+        window.orderFront(nil)
+        defer { window.close() }
+        // Let initial sizing and geometry callbacks settle before measuring scroll updates.
+        try await Task.sleep(for: .milliseconds(500))
+        func descendant(in view: NSView) -> NSScrollView? {
+            if let scroll = view as? NSScrollView { return scroll }
+            return view.subviews.lazy.compactMap { descendant(in: $0) }.first
+        }
+        let scroll = try #require(window.contentView.flatMap { descendant(in: $0) })
+        let initial = dayBuilds
+        #expect(initial > 0)
+        for step in 1...10 {
+            scroll.contentView.scroll(to: CGPoint(x: 0, y: step * 20))
+            scroll.reflectScrolledClipView(scroll.contentView)
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(scroll.contentView.bounds.minY == 200)
+        #expect(dayBuilds == initial)
+    }
+    #endif
+
     @MainActor @Test("Day cells reserve square space and keep their event dot above the next row", arguments: [60, 100, 140])
     func dayCellLayout(side: Int) throws {
         let calendar = gregorian()
@@ -138,11 +181,32 @@ struct CalendarTests {
         let range = rules.extending(to: last, selection: rules.extending(to: first, selection: nil))
         #expect(range == TimeRange(start: first, end: last))
         #expect(rules.extending(to: first.addingTimeInterval(86400), selection: range) == range)
-        #expect(rules.position(of: first.addingTimeInterval(3600), in: range) == .leading)
-        #expect(rules.position(of: last, in: range) == .trailing)
-        #expect(rules.position(of: first.addingTimeInterval(86400), in: range) == .inner)
-        #expect(rules.position(of: first.addingTimeInterval(-86400), in: range) == nil)
-        #expect(rules.position(of: first, in: TimeRange(start: first, end: first)) == .single)
+        #expect(rules.normalized(TimeRange(start: first.addingTimeInterval(3600), end: last.addingTimeInterval(3600))) == range)
+        #expect(CalendarSelection.position(ofDay: first, in: range) == .leading)
+        #expect(CalendarSelection.position(ofDay: last, in: range) == .trailing)
+        #expect(CalendarSelection.position(ofDay: first.addingTimeInterval(86400), in: range) == .inner)
+        #expect(CalendarSelection.position(ofDay: first.addingTimeInterval(-86400), in: range) == nil)
+        #expect(CalendarSelection.position(ofDay: first, in: TimeRange(start: first, end: first)) == .single)
+    }
+
+    @Test("A grid-wide selection matches day boundaries across daylight saving", arguments: ["America/New_York", "Australia/Brisbane"])
+    func normalizedGridSelection(timeZone: String) throws {
+        let calendar = gregorian(timeZone)
+        let rules = CalendarSelection(calendar: calendar)
+        let start = try date(2024, 3, 9, hour: 12, calendar: calendar)
+        let end = try date(2024, 3, 11, hour: 16, calendar: calendar)
+        let selectedDays = rules.normalized(TimeRange(start: start, end: end))
+        let grid = CalendarGrid(calendar: calendar).periods(containing: start, type: .monthly)
+        let days = try #require(grid.first).dates
+        let positions = days.compactMap { day -> (Int, DaySelection)? in
+            CalendarSelection.position(ofDay: day, in: selectedDays).map {
+                (calendar.component(.day, from: day), $0)
+            }
+        }
+        #expect(positions.map(\.0) == [9, 10, 11])
+        #expect(positions.map(\.1) == [.leading, .inner, .trailing])
+        #expect(CalendarSelection.position(ofDay: start, in: nil) == nil)
+        #expect(CalendarSelection.position(ofDay: start, in: rules.normalized(TimeRange(start: end, end: start))) == nil)
     }
 
     @Test("Month shifting clamps the day rather than overflowing February")
@@ -189,22 +253,31 @@ struct CalendarTests {
         #expect(months == Set(1...12))
     }
 
-    @MainActor @Test("Custom builders retain week mode and disabled selection")
+    @MainActor @Test("Custom builders preserve selected dates, week mode and disabled selection")
     func customBuildersRetainSettings() throws {
         let calendar = gregorian()
         var renderedDays: [Date] = []
+        var selectedDays: Set<Date> = []
         var enabledValues: [Bool] = []
+        let owner = RangeOwner()
+        let start = try date(2024, 2, 6, hour: 12, calendar: calendar)
+        let end = try date(2024, 2, 8, hour: 16, calendar: calendar)
+        owner.selection = start...end
         let view = CalendarView(date: .constant(try date(2024, 2, 10, calendar: calendar)),
+                                selection: Binding(for: \RangeOwner.selection, on: owner),
                                 calendar: calendar, type: .weekly)
             .selectionEnabled(false).multiselectionEnabled(false)
             .headerView { _, _ in Text("Custom header") }
             .weekdaysView { _ in Text("Custom weekdays") }
-            .dayView { date, _, _, _ in
-                DayProbe(date: date) { day, enabled in renderedDays.append(day); enabledValues.append(enabled) }
+            .dayView { date, _, _, position in
+                if position != nil { selectedDays.insert(date) }
+                return DayProbe(date: date) { day, enabled in renderedDays.append(day); enabledValues.append(enabled) }
             }
         let image = ImageRenderer(content: view.frame(width: 350, height: 150)).cgImage
         #expect(image != nil)
         #expect(Set(renderedDays).count == 7)
+        #expect(selectedDays == Set(try [6, 7, 8].map { try date(2024, 2, $0, calendar: calendar) }))
+        #expect(owner.selection == start...end, "Styling must not rewrite the caller's dates or times")
         #expect(!enabledValues.isEmpty && enabledValues.allSatisfy { !$0 })
     }
 }

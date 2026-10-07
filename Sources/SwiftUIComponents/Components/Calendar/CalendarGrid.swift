@@ -5,6 +5,20 @@ import Foundation
 struct CalendarGrid {
     let calendar: Calendar
 
+    func periods(containing date: Date, type: CalendarType) -> [CalendarPeriod] {
+        switch type {
+        case .weekly:
+            return [CalendarPeriod(month: date, dates: week(containing: date))]
+        case .monthly:
+            let month = calendar.dateInterval(of: .month, for: date)?.start ?? date
+            return [CalendarPeriod(month: month, dates: self.month(containing: month))]
+        case .yearly:
+            return months(inYearContaining: date).map {
+                CalendarPeriod(month: $0, dates: month(containing: $0))
+            }
+        }
+    }
+
     func week(containing date: Date) -> [Date] {
         guard let start = calendar.dateInterval(of: .weekOfYear, for: date)?.start else { return [] }
         return days(startingAt: start, count: calendar.weekdaySymbols.count)
@@ -37,6 +51,12 @@ struct CalendarGrid {
     }
 }
 
+struct CalendarPeriod: Identifiable {
+    let month: Date
+    let dates: [Date]
+    var id: Date { dates.first ?? month }
+}
+
 struct CalendarSelection {
     let calendar: Calendar
 
@@ -59,11 +79,17 @@ struct CalendarSelection {
                          end: max(calendar.startOfDay(for: selection.end), date))
     }
 
-    func position(of date: Date, in selection: TimeRange?) -> DaySelection? {
+    func normalized(_ selection: TimeRange?) -> TimeRange? {
+        selection.map {
+            TimeRange(start: calendar.startOfDay(for: $0.start), end: calendar.startOfDay(for: $0.end))
+        }
+    }
+
+    /// Grid dates are already day boundaries; normalize the selection once for the entire grid.
+    static func position(ofDay day: Date, in selection: TimeRange?) -> DaySelection? {
         guard let selection else { return nil }
-        let day = calendar.startOfDay(for: date)
-        let start = calendar.startOfDay(for: selection.start)
-        let end = calendar.startOfDay(for: selection.end)
+        let start = selection.start
+        let end = selection.end
         guard start <= day, day <= end else { return nil }
         if start == end { return .single }
         if day == start { return .leading }

@@ -26,7 +26,8 @@ struct DynamicListExampleView: View {
                     Text("Variable").tag(Sizing.variable)
                 }.pickerStyle(.segmented)
                 Toggle("Show more cell content", isOn: $expanded).disabled(sizing != .automatic)
-                Stepper("Cells: \(count)", value: $count, in: 0...1000, step: 10)
+                Stepper("Cells: \(count)", value: $count, in: 0...10_000, step: 10)
+                Button("Use 10,000 cells") { count = 10_000 }
                 Group {
                     switch sizing {
                     case .automatic:
@@ -52,6 +53,7 @@ struct DynamicListExampleView: View {
                 HStack {
                     Button("Start") { withAnimation { scrollToIndex = 0 } }
                     Button("Advance 3 cells") { withAnimation { scrollToIndex = min(count - 1, (visibleIndex ?? 0) + 3) } }
+                    Button("Middle") { withAnimation { scrollToIndex = count / 2 } }
                     Button("End") { withAnimation { scrollToIndex = count - 1 } }
                 }
             }.padding()
@@ -80,5 +82,6 @@ struct DynamicListExampleView: View {
                         in: RoundedRectangle(cornerRadius: 10))
             .padding(4)
         }.buttonStyle(.plain)
+        .accessibilityIdentifier("dynamic-list-cell-\(index)")
     }
 }

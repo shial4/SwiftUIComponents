@@ -13,6 +13,10 @@ public struct DynamicList<Content: View>: View {
     @Binding private var scrollToIndex: Int?
     @State var reportedID: AnyHashable?
     #if !os(Android)
+    @State var jumpTask: Task<Void, Never>?
+    @State var arrivalIndex: Int?
+    @State var visibleIndexIDs: Set<Int> = []
+    @State var requestTransaction = DynamicListTransaction()
     @Binding private var scrollOffset: Double
     private var usesPointOffsets = false
     @State var position: ScrollPosition
@@ -59,7 +63,7 @@ public struct DynamicList<Content: View>: View {
         self.lengths = lengths
         self.cellBuilder = viewForCell
         let initialIndex = count > 0
-            ? scrollToIndex.wrappedValue.map { min(max(0, $0), count - 1) } : nil
+            ? min(max(0, scrollToIndex.wrappedValue ?? 0), count - 1) : nil
         self._reportedID = State(initialValue: initialIndex.map(AnyHashable.init))
         #if !os(Android)
         self._pointOrientation = State(initialValue: orientation)
@@ -115,19 +119,63 @@ public struct DynamicList<Content: View>: View {
     private var indexedList: some View {
         ScrollViewReader { proxy in
             nativeList
+                #if os(Android)
                 .scrollPosition(id: $reportedID)
+                #else
+                // Publish after layout rather than feeding visible IDs back into
+                // the same layout pass while lazy estimates are being corrected.
+                .task(id: visibleIndexIDs) {
+                    guard !Task.isCancelled else { return }
+                    // A lazy stack can be briefly empty while resolving a distant
+                    // target. Keep the last position until new cells are laid out.
+                    guard !visibleIndexIDs.isEmpty || numberOfItems == 0 else { return }
+                    let id = visibleIndexIDs.min().map(AnyHashable.init)
+                    if reportedID != id { reportedID = id }
+                }
+                // onChange does not carry the caller's transaction. A changing
+                // child captures it before the deferred scroll request runs.
+                .background {
+                    Color.clear.id(scrollToIndex).transaction { transaction in
+                        requestTransaction.value = transaction
+                    }
+                }
+                .onScrollPhaseChange { oldPhase, phase in
+                    if phase == .interacting || phase == .tracking {
+                        cancelJump()
+                    } else if oldPhase == .animating, phase == .idle, let index = arrivalIndex {
+                        arrivalIndex = nil
+                        jumpTask = Task { @MainActor in
+                            try? await Task.sleep(for: .milliseconds(80))
+                            guard !Task.isCancelled, !visibleIndexIDs.contains(index) else { return }
+                            await alignIndex(index, proxy: proxy)
+                        }
+                    }
+                }
+                .onDisappear { cancelJump() }
+                #endif
                 .task(id: orientation) {
                     await Task.yield()
+                    guard !Task.isCancelled else { return }
                     requestIndex(scrollToIndex, proxy: proxy)
-                    visibleCellChange(clampedIndex(reportedIndex))
                 }
                 .onChange(of: scrollToIndex) { _, value in requestIndex(value, proxy: proxy) }
-                .onChange(of: reportedID) { _, _ in visibleCellChange(clampedIndex(reportedIndex)) }
+                .onChange(of: clampedIndex(reportedIndex), initial: true) { _, index in visibleCellChange(index) }
                 .onChange(of: numberOfItems) { _, count in
-                    requestIndex(scrollToIndex, proxy: proxy)
+                    #if !os(Android)
+                    cancelJump()
+                    #endif
                     if count == 0 {
-                        reportedID = nil
-                        visibleCellChange(nil)
+                        if scrollToIndex != nil { scrollToIndex = nil }
+                        if reportedID != nil { reportedID = nil }
+                    } else if let scrollToIndex {
+                        requestIndex(scrollToIndex, proxy: proxy)
+                    } else if reportedID == nil {
+                        #if os(Android)
+                        // Skip reports index changes; empty -> first cell can stay at
+                        // native index zero without producing another notification.
+                        reportedID = AnyHashable(0)
+                        #endif
+                        requestIndex(0, proxy: proxy)
                     }
                 }
         }
@@ -150,10 +198,79 @@ public struct DynamicList<Content: View>: View {
     private func requestIndex(_ value: Int?, proxy: ScrollViewProxy) {
         guard let value else { return }
         let index = clampedIndex(value)
+        #if !os(Android)
+        cancelJump()
+        #endif
+        guard let index else {
+            scrollToIndex = nil
+            return
+        }
+        let anchor: UnitPoint = orientation == .horizontal ? .leading : .top
+        #if os(Android)
+        // Compose's native lazy-list animation already skips distant items.
         scrollToIndex = nil
-        reportedID = index.map(AnyHashable.init)
-        if let index { proxy.scrollTo(index, anchor: orientation == .horizontal ? .leading : .top) }
+        proxy.scrollTo(index, anchor: anchor)
+        #else
+        let origin = reportedIndex ?? 0
+        jumpTask = Task { @MainActor in
+            await Task.yield()
+            guard !Task.isCancelled else { return }
+            let transaction = requestTransaction.value
+            let animated = transaction.animation != nil && !transaction.disablesAnimations
+            scrollToIndex = nil
+            let approach = max(3, visibleIndexIDs.count + 1)
+            let isDistant = abs(index - origin) > max(8, visibleIndexIDs.count * 2)
+            let nearby: Int
+            if isDistant {
+                // Leave roughly one viewport for the arrival. Account for end clamping
+                // so jumping to the last cell still has room to animate.
+                nearby = index > origin ? max(0, index - approach)
+                    : index + min(approach, numberOfItems - 1 - index)
+            } else {
+                nearby = index
+            }
+            if nearby != index {
+                await alignIndex(nearby, proxy: proxy)
+            }
+            guard !Task.isCancelled else { return }
+            if animated {
+                arrivalIndex = index
+                withTransaction(transaction) {
+                    proxy.scrollTo(index, anchor: anchor)
+                }
+            } else {
+                await alignIndex(index, proxy: proxy)
+            }
+        }
+        #endif
     }
+
+    #if !os(Android)
+    private func cancelJump() {
+        jumpTask?.cancel()
+        arrivalIndex = nil
+    }
+
+    private func alignIndex(_ index: Int, proxy: ScrollViewProxy) async {
+        // Lazy stacks revise their estimated extent after a distant scroll.
+        // Bound corrections, yielding to layout and allowing user input to cancel.
+        var wasVisible = false
+        for _ in 0..<6 {
+            guard !Task.isCancelled else { return }
+            if !wasVisible {
+                var immediate = Transaction(animation: nil)
+                immediate.disablesAnimations = true
+                withTransaction(immediate) {
+                    proxy.scrollTo(index, anchor: orientation == .horizontal ? .leading : .top)
+                }
+            }
+            try? await Task.sleep(for: .milliseconds(80))
+            let visible = visibleIndexIDs.contains(index)
+            if visible && wasVisible { return }
+            wasVisible = visible
+        }
+    }
+    #endif
 
     /// Reports the visible cell's index, or nil for empty content.
     /// Native containers choose which visible cell to report near the trailing edge.
@@ -166,9 +283,9 @@ public struct DynamicList<Content: View>: View {
     private var nativeList: some View {
         ScrollView(orientation == .horizontal ? .horizontal : .vertical) {
             if orientation == .horizontal {
-                LazyHStack(spacing: 0) { cells }.scrollTargetLayout()
+                LazyHStack(spacing: 0) { cells }
             } else {
-                LazyVStack(spacing: 0) { cells }.scrollTargetLayout()
+                LazyVStack(spacing: 0) { cells }
             }
         }
     }
@@ -179,7 +296,7 @@ public struct DynamicList<Content: View>: View {
             ScrollView(orientation == .horizontal ? .horizontal : .vertical) {
                 pointOffsetContent
                     // Observe the laid-out content, including lazy-stack estimate corrections.
-                    .onGeometryChange(for: DynamicListViewport.self) { geometry in
+                    .onGeometryChange(for: DynamicListViewport.self) { [orientation] geometry in
                         let space = NamedCoordinateSpace.scrollView(axis: orientation == .horizontal ? .horizontal : .vertical)
                         let frame = geometry.frame(in: space)
                         let bounds = geometry.bounds(of: space)?.size ?? .zero
@@ -257,6 +374,7 @@ public struct DynamicList<Content: View>: View {
     private var pointOffsetCells: some View {
         ForEach(0..<numberOfItems, id: \.self) { index in
             cell(at: index)
+                .id(index)
                 .onScrollVisibilityChange(threshold: 0.001) { visible in
                     if visible {
                         visiblePointIDs.insert(index)
@@ -271,15 +389,23 @@ public struct DynamicList<Content: View>: View {
     private var cells: some View {
         ForEach(0..<numberOfItems, id: \.self) { index in
             cell(at: index)
+                .id(index)
+                #if !os(Android)
+                .modifier(DynamicListCellVisibility(orientation: orientation) { visible in
+                    guard visibleIndexIDs.contains(index) != visible else { return }
+                    if visible { visibleIndexIDs.insert(index) } else { visibleIndexIDs.remove(index) }
+                })
+                #endif
         }
     }
 
-    private func cell(at index: Int) -> some View {
-        let length = lengths.map { CGFloat($0[index]) }
-        return cellBuilder(index)
-            .frame(width: orientation == .horizontal ? length : nil,
-                   height: orientation == .vertical ? length : nil)
-            .id(index)
+    private func cell(at index: Int) -> VStack<DynamicListCell<Content>> {
+        // A concrete container gives each index one layout child even when the
+        // user's content has a variable number of views. Do not erase its type.
+        VStack(spacing: 0) {
+            DynamicListCell(index: index, orientation: orientation,
+                            length: lengths.map { CGFloat($0[index]) }, content: cellBuilder)
+        }
     }
 
     #if !os(Android)
@@ -309,6 +435,21 @@ public struct DynamicList<Content: View>: View {
         var view = self
         view.orientation = orientation
         return view
+    }
+}
+
+// Keep the explicit scroll target on a lightweight cell. Its separate body
+// defers user content while SwiftUI resolves identities for distant jumps.
+struct DynamicListCell<Content: View>: View {
+    let index: Int
+    let orientation: Orientation
+    let length: CGFloat?
+    let content: (Int) -> Content
+
+    var body: some View {
+        content(index)
+            .frame(width: orientation == .horizontal ? length : nil,
+                   height: orientation == .vertical ? length : nil)
     }
 }
 
@@ -390,3 +531,35 @@ struct DynamicListLengths: Equatable, Sendable {
 
     private static func validLength(_ value: Double) -> Double { value.isFinite ? max(0, value) : 0 }
 }
+
+#if !os(Android)
+// Cached lazy cells can reappear without a geometry-value change. Restore their
+// last measured visibility on appearance and remove them on disappearance.
+struct DynamicListCellVisibility: ViewModifier {
+    let orientation: Orientation
+    let action: (Bool) -> Void
+    @State var isVisible = false
+
+    func body(content: Content) -> some View {
+        content
+            .onGeometryChange(for: Bool.self) { [orientation] geometry in
+                let space = NamedCoordinateSpace.scrollView(axis: orientation == .horizontal ? .horizontal : .vertical)
+                let frame = geometry.frame(in: space)
+                let viewport = geometry.bounds(of: space)?.size ?? .zero
+                let start = orientation == .horizontal ? frame.minX : frame.minY
+                let length = orientation == .horizontal ? frame.width : frame.height
+                let limit = orientation == .horizontal ? viewport.width : viewport.height
+                return length > 0 && min(start + length, limit) - max(start, 0) >= length * 0.1
+            } action: { visible in
+                isVisible = visible
+                action(visible)
+            }
+            .onAppear { action(isVisible) }
+            .onDisappear { action(false) }
+    }
+}
+
+final class DynamicListTransaction {
+    var value = Transaction()
+}
+#endif

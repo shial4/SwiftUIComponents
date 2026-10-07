@@ -106,15 +106,11 @@ extension MuscleMap {
             guard let structure = structure(at: location, in: rect) else {
                 return
             }
-            onSelect(structure)
+            structureSelect(structure)
         }
         
         private func configuration(_ structure: MuscleMap.Structure) -> MuscleMap.Style {
             return styleRequest(structure) ?? MuscleMap.Style()
-        }
-        
-        private func onSelect(_ structure: MuscleMap.Structure) {
-            structureSelect(structure)
         }
         
         // MARK: Modifiers

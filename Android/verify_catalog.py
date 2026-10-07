@@ -31,9 +31,13 @@ class Catalogue:
     def bounds(node):
         return tuple(map(int, re.findall(r"\d+", node.get("bounds", ""))))
 
+    @staticmethod
+    def center(node):
+        x1, y1, x2, y2 = Catalogue.bounds(node)
+        return (x1 + x2) // 2, (y1 + y2) // 2
+
     def tap_node(self, node):
-        x1, y1, x2, y2 = self.bounds(node)
-        self.run("shell", "input", "tap", str((x1 + x2) // 2), str((y1 + y2) // 2))
+        self.run("shell", "input", "tap", *map(str, self.center(node)))
         time.sleep(0.4)
 
     def tap(self, label):
@@ -73,7 +77,10 @@ class Catalogue:
         field = next(n for n in root if n.get("class") == "android.widget.EditText")
         self.tap_node(field)
         self.run("shell", "input", "text", demo.replace(" ", "%s"))
-        self.run("shell", "input", "keyevent", "KEYCODE_BACK")
+        # Back leaves the activity when the software keyboard has not opened.
+        keyboard = self.run("shell", "dumpsys", "input_method").decode()
+        if "mInputShown=true" in keyboard:
+            self.run("shell", "input", "keyevent", "KEYCODE_BACK")
         for _ in range(4):
             target = next((n for n in self.nodes() if n.get("text") == demo
                            and n.get("class") != "android.widget.EditText"), None)
@@ -91,14 +98,29 @@ class Catalogue:
     def has_text(self, text):
         return any(n.get("text") == text for n in self.nodes())
 
-    def visible_index(self):
-        for node in self.nodes():
+    def visible_index(self, nodes=None):
+        for node in (self.nodes() if nodes is None else nodes):
             text = node.get("text", "")
             if text.startswith("Visible cell:"):
-                return int(text.split(":")[1])
+                return int(text.split(":")[1].replace(",", ""))
             if text == "No visible cell":
                 return None
         raise AssertionError("Missing DynamicList position")
+
+    def wait_for(self, predicate, timeout=5):
+        """Wait for rendered state, including native animations, within a deadline."""
+        deadline = time.monotonic() + timeout
+        while True:
+            if predicate(self.nodes()):
+                return True
+            if time.monotonic() >= deadline:
+                return False
+            time.sleep(0.1)
+
+    def calendar_days(self, nodes=None):
+        return [n for n in (self.nodes() if nodes is None else nodes) if re.match(
+            r"^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday), .*\d{4}$",
+            n.get("content-desc", ""))]
 
     def swipe(self, x1, y1, x2, y2, duration=400):
         self.run("shell", "input", "swipe", str(x1), str(y1), str(x2), str(y2), str(duration))
@@ -150,22 +172,33 @@ def verify_search(catalogue):
 
 
 def verify_dynamic_list(catalogue):
+    def at_index(index):
+        # Observe the callback and the actual cell in the same UI snapshot.
+        return catalogue.wait_for(lambda nodes: catalogue.visible_index(nodes) == index
+                                  and any(n.get("text") == str(index) for n in nodes))
+
+    def shows_cell(index):
+        return catalogue.wait_for(lambda nodes: any(n.get("text") == str(index) for n in nodes))
+
     catalogue.open("DynamicList")
+    check("non-empty list reports its initial visible cell", catalogue.visible_index() == 0)
     for axis in ("Horizontal", "Vertical"):
         catalogue.tap(axis)
         catalogue.tap("Start")
-        check(axis + " initial cell-ID position", catalogue.visible_index() == 0)
+        check(axis + " initial cell-ID position", at_index(0))
         catalogue.tap("Advance 3 cells")
-        check(axis + " cell-ID command", catalogue.visible_index() == 3 and catalogue.has_text("3"))
+        check(axis + " cell-ID command", at_index(3))
         catalogue.tap("End")
-        check(axis + " end cell is visible", catalogue.has_text("29"))
+        check(axis + " end cell is visible", shows_cell(29))
         catalogue.tap("Start")
+        check(axis + " returns to the first cell", at_index(0))
         catalogue.switch("Show more cell content")
         check(axis + " automatic cells resize", catalogue.has_text("Additional cell content"))
         catalogue.tap("Advance 3 cells")
-        check(axis + " resized cell-ID command", catalogue.visible_index() == 3)
+        check(axis + " resized cell-ID command", at_index(3))
         catalogue.switch("Show more cell content")
         catalogue.tap("Start")
+        check(axis + " resets before the native drag", at_index(0))
         nodes = catalogue.nodes()
         top = catalogue.bounds(next(n for n in nodes if n.get("text") == "Cells: 30"))[3] + 30
         bottom = catalogue.bounds(next(n for n in nodes if n.get("text", "").startswith("Visible cell:")))[1] - 30
@@ -179,18 +212,60 @@ def verify_dynamic_list(catalogue):
     catalogue.tap("Decrement")
     check("shrinking list keeps a valid position", 0 <= catalogue.visible_index() < 20)
     catalogue.tap("End")
-    check("shrinking list exposes its last cell", catalogue.has_text("19"))
+    check("shrinking list exposes its last cell", shows_cell(19))
     catalogue.tap("Decrement")
     catalogue.tap("Decrement")
-    check("empty list publishes nil", catalogue.visible_index() is None)
+    check("empty list publishes nil", catalogue.wait_for(lambda nodes: catalogue.visible_index(nodes) is None))
     catalogue.tap("Increment")
+    check("repopulated list reports its initial cell", at_index(0))
     catalogue.tap("Start")
-    check("repopulated list scrolls", catalogue.visible_index() == 0)
+    check("repopulated list scrolls", at_index(0))
+    catalogue.tap("0")
+    check("list cell taps reach their content action", catalogue.has_text("Selected cell: 0"))
     for sizing in ("Uniform", "Variable"):
         catalogue.tap(sizing)
+        check(sizing + " sizing preserves the selected cell", catalogue.has_text("Selected cell: 0"))
         catalogue.tap("Start")
         catalogue.tap("Advance 3 cells")
-        check(sizing + " explicit lengths scroll by cell ID", catalogue.visible_index() == 3)
+        check(sizing + " explicit lengths scroll by cell ID", at_index(3))
+
+
+def verify_dynamic_list_long_jumps(catalogue):
+    catalogue.open("DynamicList")
+    catalogue.tap("Use 10,000 cells")
+
+    # Skip currently animates a longer final stretch for distant requests.
+    # This deadline verifies arrival, not the separate animation-performance limitation.
+    def cell(nodes, index):
+        return next((n for n in nodes if n.get("resource-id") == f"dynamic-list-cell-{index}"
+                     and catalogue.bounds(n)[2] > catalogue.bounds(n)[0]
+                     and catalogue.bounds(n)[3] > catalogue.bounds(n)[1]), None)
+
+    for axis in ("Horizontal", "Vertical"):
+        catalogue.tap(axis)
+        for sizing in ("Automatic", "Uniform", "Variable"):
+            catalogue.tap(sizing)
+            for command, target in (("Start", 0), ("End", 9999), ("Middle", 5000), ("End", 9999), ("Start", 0)):
+                catalogue.tap(command)
+                check(f"{axis} {sizing} long jump to {target}",
+                      catalogue.wait_for(lambda nodes: cell(nodes, target) is not None, timeout=20))
+                catalogue.tap_node(cell(catalogue.nodes(), target))
+                check(f"{axis} {sizing} target {target} remains interactive",
+                      catalogue.wait_for(lambda nodes: any(n.get("text", "").replace(",", "")
+                                                           == f"Selected cell: {target}" for n in nodes)))
+            catalogue.tap("Middle")
+            check(f"{axis} {sizing} returns to the middle", catalogue.wait_for(lambda nodes: cell(nodes, 5000) is not None, timeout=20))
+            nodes = catalogue.nodes()
+            before = catalogue.visible_index(nodes)
+            top = catalogue.bounds(next(n for n in nodes if n.get("text") == "Use 10,000 cells"))[3] + 20
+            bottom = catalogue.bounds(next(n for n in nodes if n.get("text", "").startswith("Visible cell:")))[1] - 20
+            if axis == "Horizontal":
+                catalogue.swipe(200, (top + bottom) // 2, 850, (top + bottom) // 2)
+            else:
+                catalogue.swipe(540, top + 30, 540, bottom - 30)
+            check(f"{axis} {sizing} native drag after a long jump",
+                  catalogue.wait_for(lambda nodes: catalogue.visible_index(nodes) is not None
+                                      and catalogue.visible_index(nodes) < before))
 
 
 def verify_integrations(catalogue):
@@ -282,14 +357,8 @@ def verify_progress(catalogue):
 
 
 def verify_calendar(catalogue):
-    def days(nodes=None):
-        return [n for n in (catalogue.nodes() if nodes is None else nodes) if re.match(
-            r"^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday), .*\d{4}$",
-            n.get("content-desc", ""))]
-
-    def center(node):
-        left, top, right, bottom = catalogue.bounds(node)
-        return (left + right) // 2, (top + bottom) // 2
+    days = catalogue.calendar_days
+    center = catalogue.center
 
     def square_cells(nodes, clipped_edges=()):
         # Android accessibility bounds clip partially visible rows to the scroll viewport.
@@ -350,8 +419,69 @@ def verify_calendar(catalogue):
             break
         time.sleep(0.2)
     check("year calendar exposes dates across adjacent months", first is not None and last is not None)
+    # Scroll between month columns so the page moves without starting a range.
+    # Drag selection must use the new row positions even when days do not redraw.
+    original_top = catalogue.bounds(first)[1]
+    scroll = next(n for n in catalogue.nodes() if n.get("scrollable") == "true")
+    left, top, right, bottom = catalogue.bounds(scroll)
+    middle = (left + right) // 2
+    height = bottom - top
+    for _ in range(3):
+        catalogue.swipe(middle, top + height * 3 // 4, middle, top + height // 4, duration=1000)
+        cells = days()
+        first = next((n for n in cells if re.search(r", 5 January \d{4}$", n.get("content-desc", ""))), None)
+        last = next((n for n in cells if re.search(r", 11 February \d{4}$", n.get("content-desc", ""))), None)
+        if first is None or catalogue.bounds(first)[1] < original_top:
+            break
+    check("year calendar scroll changes day positions", first is not None and last is not None
+          and catalogue.bounds(first)[1] < original_top)
+    check("scrolling between months preserves the selection", catalogue.has_text("Selected days: 0"))
     catalogue.drag(*center(first), *center(last))
-    check("calendar drag crosses month boundaries in year mode", catalogue.has_text("Selected days: 38"))
+    check("calendar drag crosses month boundaries after scrolling", catalogue.has_text("Selected days: 38"))
+
+
+def verify_calendar_state(catalogue):
+    def summary():
+        texts = [n.get("text") for n in catalogue.nodes() if n.get("text")]
+        index = next(i for i, text in enumerate(texts) if text.endswith(" selected calendar days"))
+        return texts[index - 1], texts[index]
+
+    def drag_days(first, last):
+        days = catalogue.calendar_days()
+        catalogue.drag(*catalogue.center(days[first]), *catalogue.center(days[last]))
+
+    catalogue.open("Calendar")
+    catalogue.tap("Week")
+    catalogue.tap_node(catalogue.calendar_days()[1])
+    catalogue.tap_node(catalogue.calendar_days()[3])
+    selected = summary()
+    check("calendar establishes a three-day range", selected[1] == "3 selected calendar days")
+    catalogue.switch("Custom day cells")
+    check("custom day and header styling preserves the exact selected range", summary() == selected)
+    catalogue.tap("Next")
+    check("calendar navigation preserves offscreen selected dates", summary() == selected)
+    catalogue.tap("Previous")
+    catalogue.switch("Monday first")
+    check("weekday order changes preserve selected dates", summary() == selected)
+    catalogue.switch("Enable selection")
+    catalogue.tap_node(catalogue.calendar_days()[0])
+    drag_days(0, 4)
+    check("disabled custom calendar ignores taps and range drags", summary() == selected)
+    catalogue.switch("Enable selection")
+    catalogue.switch("Select a date range")
+    catalogue.tap_node(catalogue.calendar_days()[0])
+    single = summary()
+    check("single-selection mode replaces the range", single[1] == "1 selected calendar days")
+    drag_days(1, 3)
+    check("single-selection mode ignores range drags", summary() == single)
+    catalogue.switch("Custom day cells")
+    catalogue.tap("Month")
+    catalogue.tap("Week")
+    check("restoring default style and period preserves selection", summary() == single)
+    catalogue.switch("Select a date range")
+    catalogue.tap("Clear selection")
+    drag_days(1, 3)
+    check("range dragging still works after style and mode changes", summary()[1] == "3 selected calendar days")
 
 
 def verify_muscle_map(catalogue, screenshots=None):
@@ -365,7 +495,18 @@ def verify_muscle_map(catalogue, screenshots=None):
         time.sleep(0.4)
 
     def selected():
-        return next(n.get("text") for n in catalogue.nodes() if n.get("text", "").startswith("Selected:"))
+        for _ in range(3):
+            nodes = catalogue.nodes()
+            value = next((n.get("text") for n in nodes if n.get("text", "").startswith("Selected:")), None)
+            if value is not None:
+                return value
+            # Shorter viewports place the summary below the map. This tap-only
+            # map permits page scrolling without changing the selected regions.
+            target = next(n for n in nodes if n.get("content-desc") == "Muscle map")
+            left, top, right, bottom = catalogue.bounds(target)
+            catalogue.swipe((left + right) // 2, bottom - 50, (left + right) // 2,
+                            max(top, bottom - 450))
+        raise AssertionError("Missing muscle-map selection summary")
 
     def painted_count():
         return int(next(n.get("text") for n in catalogue.nodes()
@@ -376,6 +517,14 @@ def verify_muscle_map(catalogue, screenshots=None):
     tap_point(point("Muscle map", .5, .2))
     check("front map tap selects a named region", "neck" in selected())
     selection = selected()
+    catalogue.switch("Show region outlines")
+    check("map outline styling preserves selected regions", selected() == selection)
+    catalogue.tap("Linear")
+    catalogue.tap("Radial")
+    check("map gradient styling preserves selected regions", selected() == selection)
+    catalogue.tap("Both")
+    check("map visibility changes preserve selected regions", selected() == selection)
+    catalogue.tap("Front")
     catalogue.switch("Enable map selection")
     tap_point(point("Muscle map", .5, .2))
     check("disabled map tap preserves selection", selected() == selection)
@@ -441,8 +590,10 @@ def verify(catalogue, screenshots):
 
     verify_search(catalogue)
     verify_dynamic_list(catalogue)
+    verify_dynamic_list_long_jumps(catalogue)
     verify_integrations(catalogue)
     verify_calendar(catalogue)
+    verify_calendar_state(catalogue)
     verify_muscle_map(catalogue, screenshots)
 
     catalogue.open("Codable Storage")

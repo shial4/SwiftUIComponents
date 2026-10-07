@@ -4,7 +4,7 @@ import SwiftUI
 public struct CalendarContentView<Day: View>: View {
     @Binding private var selection: TimeRange?
     @State var width: Double = 0
-    @State var rowFrames: [CalendarRowID: CGRect] = [:]
+    @State var rowGeometry = CalendarRowGeometry()
     private var isMultiselectionEnabled = true
     private var isSelectionEnabled = true
     private let type: CalendarType
@@ -28,43 +28,27 @@ public struct CalendarContentView<Day: View>: View {
     }
 
     public var body: some View {
-        let periods = displayedPeriods
-        let frames = rowFrames
-        return content(periods: periods)
+        let periods = CalendarGrid(calendar: calendar).periods(containing: previewDate, type: type)
+        let selectedDays = CalendarSelection(calendar: calendar).normalized(selection)
+        return content(periods: periods, selectedDays: selectedDays)
             .onGeometryChange(for: Double.self, of: { $0.size.width }) { if width != $0 { width = $0 } }
             #if !os(tvOS)
             .simultaneousGesture(DragGesture(minimumDistance: 0, coordinateSpace: .global)
                 .onChanged { value in
                     guard hypot(value.translation.width, value.translation.height) >= 4 else { return }
                     // Preserve the touch-down day when the first move crosses a cell.
-                    if selection == nil { extendSelection(at: value.startLocation, periods: periods, frames: frames) }
-                    extendSelection(at: value.location, periods: periods, frames: frames)
+                    if selection == nil { extendSelection(at: value.startLocation, periods: periods) }
+                    extendSelection(at: value.location, periods: periods)
                 })
             #endif
     }
 
-    private var displayedPeriods: [CalendarPeriod] {
-        let grid = CalendarGrid(calendar: calendar)
-        switch type {
-        case .weekly:
-            let dates = grid.week(containing: previewDate)
-            return [CalendarPeriod(month: previewDate, dates: dates)]
-        case .monthly:
-            let month = calendar.dateInterval(of: .month, for: previewDate)?.start ?? previewDate
-            return [CalendarPeriod(month: month, dates: grid.month(containing: month))]
-        case .yearly:
-            return grid.months(inYearContaining: previewDate).map {
-                CalendarPeriod(month: $0, dates: grid.month(containing: $0))
-            }
-        }
-    }
-
-    @ViewBuilder private func content(periods: [CalendarPeriod]) -> some View {
+    @ViewBuilder private func content(periods: [CalendarPeriod], selectedDays: TimeRange?) -> some View {
         let monthWidth = max(0, (width - Double(yearColumns - 1) * monthSpacing) / Double(yearColumns))
         let side = width > 0 ? monthWidth / Double(calendar.weekdaySymbols.count) : nil
         switch type {
         case .weekly, .monthly:
-            if let period = periods.first { grid(period, side: side, periods: periods) }
+            if let period = periods.first { grid(period, side: side, selectedDays: selectedDays) }
         case .yearly:
             let rows = (periods.count + yearColumns - 1) / yearColumns
             let monthLength: CGFloat? = width > 0 ? CGFloat(monthWidth) : nil
@@ -72,12 +56,12 @@ public struct CalendarContentView<Day: View>: View {
             VStack(alignment: .leading, spacing: monthSpacing) {
                 ForEach(0..<rows, id: \.self) { row in
                     HStack(alignment: .top, spacing: monthSpacing) {
-                        ForEach(Array(periods[(row * yearColumns)..<min((row + 1) * yearColumns, periods.count)])) { period in
+                        ForEach(periods[(row * yearColumns)..<min((row + 1) * yearColumns, periods.count)]) { period in
                             VStack {
                                 Text(period.month.formatted(Date.FormatStyle(locale: calendar.locale ?? .current, calendar: calendar, timeZone: calendar.timeZone).month(.wide)))
                                     .font(.headline)
                                 DefaultWeekdaysHeaderView(headerTextColor: .secondary, calendar: calendar)
-                                grid(period, side: side, periods: periods)
+                                grid(period, side: side, selectedDays: selectedDays)
                             }
                             .frame(width: monthLength)
                             .frame(maxWidth: monthLength == nil ? .infinity : nil)
@@ -89,7 +73,7 @@ public struct CalendarContentView<Day: View>: View {
         }
     }
 
-    private func grid(_ period: CalendarPeriod, side: Double?, periods: [CalendarPeriod]) -> some View {
+    private func grid(_ period: CalendarPeriod, side: Double?, selectedDays: TimeRange?) -> some View {
         let columns = calendar.weekdaySymbols.count
         let rows = (period.dates.count + columns - 1) / columns
         // Each week row shares the size computed by the calendar container.
@@ -97,14 +81,14 @@ public struct CalendarContentView<Day: View>: View {
             ForEach(0..<rows, id: \.self) { row in
                 let id = CalendarRowID(period: period.id, row: row)
                 HStack(spacing: 0) {
-                    ForEach(Array(period.dates[(row * columns)..<min((row + 1) * columns, period.dates.count)]), id: \.self) { date in
-                        dayCell(date, month: period.month, side: side)
+                    ForEach(period.dates[(row * columns)..<min((row + 1) * columns, period.dates.count)], id: \.self) { date in
+                        dayCell(date, month: period.month, side: side, selectedDays: selectedDays)
                     }
                 }
                 .onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) {
-                    if rowFrames[id] != $0 { rowFrames[id] = $0 }
+                    rowGeometry.frames[id] = $0
                 }
-                .onDisappear { rowFrames.removeValue(forKey: id) }
+                .onDisappear { rowGeometry.frames.removeValue(forKey: id) }
                 .id(id)
             }
         }
@@ -112,9 +96,9 @@ public struct CalendarContentView<Day: View>: View {
         .id(period.id)
     }
 
-    private func dayCell(_ date: Date, month: Date, side: Double?) -> some View {
+    private func dayCell(_ date: Date, month: Date, side: Double?, selectedDays: TimeRange?) -> some View {
         let length: CGFloat? = side.map { CGFloat($0) }
-        let position = CalendarSelection(calendar: calendar).position(of: date, in: selection)
+        let position = CalendarSelection.position(ofDay: date, in: selectedDays)
         return Button {
             selection = CalendarSelection(calendar: calendar).tapping(date, selection: selection, multiple: isMultiselectionEnabled)
         } label: {
@@ -130,13 +114,14 @@ public struct CalendarContentView<Day: View>: View {
         .accessibilityAddTraits(position == nil ? .componentEmpty : .isSelected)
     }
 
-    private func extendSelection(at point: CGPoint, periods: [CalendarPeriod], frames: [CalendarRowID: CGRect]) {
+    private func extendSelection(at point: CGPoint, periods: [CalendarPeriod]) {
         guard isSelectionEnabled, isMultiselectionEnabled,
               point.x.isFinite, point.y.isFinite else { return }
         let columns = calendar.weekdaySymbols.count
         for period in periods {
             for row in 0..<((period.dates.count + columns - 1) / columns) {
-                guard let frame = frames[CalendarRowID(period: period.id, row: row)],
+                // Read geometry only during interaction, so scrolling does not invalidate every day.
+                guard let frame = rowGeometry.frames[CalendarRowID(period: period.id, row: row)],
                       frame.contains(point), frame.width > 0 else { continue }
                 let column = Int((point.x - frame.minX) / (frame.width / Double(columns)))
                 let index = row * columns + column
@@ -161,14 +146,14 @@ public struct CalendarContentView<Day: View>: View {
     }
 }
 
-private struct CalendarPeriod: Identifiable {
-    let month: Date
-    let dates: [Date]
-    var id: Date { dates.first ?? month }
-}
-
 // Row bounds remain usable when Android clips a partially visible row to its scroll viewport.
 struct CalendarRowID: Hashable {
     let period: Date
     let row: Int
+}
+
+// Geometry is gesture input, not rendered state. Keep its lifetime tied to the view
+// without invalidating the calendar when global row positions change during scrolling.
+@MainActor final class CalendarRowGeometry {
+    var frames: [CalendarRowID: CGRect] = [:]
 }

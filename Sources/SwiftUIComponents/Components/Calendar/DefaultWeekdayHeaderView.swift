@@ -4,15 +4,7 @@ import SwiftUI
 public struct DefaultWeekdaysHeaderView: View {
     private let headerTextColor: Color
 
-    var calendar: Calendar
-
-    var weekRange: [Int] {
-        let firstWeekday = calendar.firstWeekday
-        let symbols: [String] = calendar.shortWeekdaySymbols
-        let reorderedSymbols: [Int] = (firstWeekday-1..<symbols.count).map { $0 } + (0..<firstWeekday-1).map { $0 }
-
-        return reorderedSymbols
-    }
+    private let calendar: Calendar
 
     /// Initializes a new instance of the default weekdays header view.
     /// - Parameters:
@@ -26,8 +18,8 @@ public struct DefaultWeekdaysHeaderView: View {
     public var body: some View {
         let symbols = calendar.shortWeekdaySymbols
         return HStack {
-            ForEach(weekRange, id: \.self) { index in
-                Text(symbols[index])
+            ForEach(symbols.indices, id: \.self) { index in
+                Text(symbols[(calendar.firstWeekday - 1 + index) % symbols.count])
                 #if !os(Android)
                     .fontWidth(.compressed)
                 #endif

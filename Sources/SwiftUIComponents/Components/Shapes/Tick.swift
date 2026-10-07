@@ -21,7 +21,12 @@ import SwiftUI
 
  */
 public struct Tick: Shape {
-    public let thickness: Double
+    public var thickness: Double
+
+    public var animatableData: Double {
+        get { thickness }
+        set { thickness = newValue }
+    }
 
     /**
      Initializes a `Tick` shape with the specified thickness.
