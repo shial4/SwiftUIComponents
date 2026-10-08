@@ -20,7 +20,7 @@ Android compatibility is provided by [Skip Fuse](https://skip.dev/docs/modules/s
 
 [Install](#install) | [Components](#component-catalogue) | [Run examples](#run-the-examples) | [Build and test](#build-and-test)
 
-![Muscle Map styles and body regions running on iOS and Android](Documentation/Images/hero.png)
+![iOS interactions: Calendar date selection, Muscle Map drag painting, DynamicList content sizing and scrolling, and Progress animations](Documentation/Images/hero.gif)
 
 If a component saves you time, [star the repository](https://github.com/shial4/SwiftUIComponents) to help other developers find it.
 

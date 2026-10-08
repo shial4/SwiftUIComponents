@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compose paired README GIFs from real iOS/Android recordings (FFmpeg and Pillow)."""
+"""Compose README GIFs from real captures (FFmpeg and Pillow); --hero reuses the catalogue GIFs."""
 import argparse
 import math
 import re
@@ -91,16 +91,76 @@ def compose(ffmpeg, directory, output, name, spec):
         print(f'{target.name}: {seconds}s, {target.stat().st_size / 1024:.0f} KiB', flush=True)
 
 
+def compose_hero(ffmpeg, output):
+    # Crop only the iOS interaction from each checked-in catalogue GIF. The
+    # calendar excerpt ends before the week layout brings source code into view.
+    clips = [
+        ('calendar-selection', 'Calendar', 'Select dates and ranges', (24, 153, 296, 379), 0, 6),
+        ('muscle-paint', 'Muscle Map', 'Tap and drag to paint', (24, 221, 296, 428), 2, 7),
+        ('dynamic-list', 'DynamicList', 'Cells that fit their content', (24, 158, 296, 376), 0, 12),
+        ('progress', 'Progress', 'Animate any Shape', (24, 100, 296, 274), 2, 6),
+    ]
+    width, height, fps, seconds = 1280, 660, 12, 12
+    panel_width, gap, margin = 292, 16, 32
+    content_width, content_height, content_top = 268, 390, 224
+    canvas = Image.new('RGB', (width, height), '#101e35')
+    draw = ImageDraw.Draw(canvas)
+    draw.text((margin, 28), 'SwiftUIComponents', font=font(42, True), fill='white')
+    draw.text((margin, 86), 'Four interactive components. Real iOS captures.',
+              font=font(23), fill='#bcd9ff')
+    command = [ffmpeg, '-hide_banner', '-loglevel', 'error', '-y']
+    filters = []
+    with tempfile.TemporaryDirectory() as temporary:
+        background = Path(temporary) / 'hero-background.png'
+        for index, (name, title, subtitle, (x, y, w, h), start, duration) in enumerate(clips):
+            left = margin + index * (panel_width + gap)
+            draw.rounded_rectangle((left, 142, left + panel_width, 634),
+                                   radius=18, fill='white')
+            draw.text((left + 12, 158), title, font=font(24, True), fill='#15243a')
+            draw.text((left + 12, 191), subtitle, font=font(16), fill='#526174')
+            filters.append(
+                f'[{index + 1}:v]fps={fps},trim=start_frame={start * fps}:end_frame={(start + duration) * fps},'
+                f'crop={w}:{h}:{x}:{y},'
+                f'scale={content_width}:-2:flags=lanczos,'
+                f'pad={content_width}:{content_height}:0:(oh-ih)/2:color=white,'
+                f'loop=loop={math.ceil(seconds / duration) - 1}:size={duration * fps}:start=0,'
+                f'setpts=N/({fps}*TB),trim=end_frame={seconds * fps}[tile{index}]')
+            previous = '[0:v]' if index == 0 else f'[panel{index - 1}]'
+            filters.append(f'{previous}[tile{index}]overlay={left + 12}:{content_top}'
+                           f':shortest=1[panel{index}]')
+        canvas.save(background)
+        command.extend(['-loop', '1', '-framerate', str(fps), '-t', str(seconds), '-i', str(background)])
+        for name, *_ in clips:
+            command.extend(['-i', str(output / (name + '.gif'))])
+        filters.extend([
+            f'[panel3]trim=duration={seconds},split[frames][colors]',
+            '[colors]palettegen=stats_mode=diff[palette]',
+            '[frames][palette]paletteuse=dither=bayer:bayer_scale=3:diff_mode=rectangle[gif]',
+        ])
+        target = output / 'hero.gif'
+        command.extend(['-filter_complex', ';'.join(filters), '-map', '[gif]',
+                        '-t', str(seconds), '-loop', '0', str(target)])
+        subprocess.run(command, check=True)
+        print(f'{target.name}: {seconds}s, {target.stat().st_size / 1024:.0f} KiB', flush=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--recordings', required=True, type=Path,
+    parser.add_argument('--recordings', type=Path,
                         help='folder containing ios-<clip>.mov and android-<clip>.mp4')
     parser.add_argument('--ffmpeg', default='ffmpeg')
     parser.add_argument('--output', default=BASE / 'Images', type=Path)
     parser.add_argument('--only', action='append', choices=CLIPS,
                         help='compose only the named clip; repeatable')
+    parser.add_argument('--hero', action='store_true',
+                        help='compose the iOS overview from catalogue GIFs already in --output')
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
+    if args.hero:
+        compose_hero(args.ffmpeg, args.output)
+        return
+    if args.recordings is None:
+        parser.error('--recordings is required unless --hero is used')
     for name, spec in CLIPS.items():
         if args.only and name not in args.only:
             continue

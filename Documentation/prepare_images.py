@@ -84,25 +84,6 @@ def gallery(entries, ios, android, output, title, columns=4, tile_width=280, til
     save(canvas, output)
 
 
-def hero(ios, android, output, count):
-    canvas = Image.new('RGB', (1280, 830), '#101e35')
-    draw = ImageDraw.Draw(canvas)
-    draw.text((40, 26), 'SwiftUIComponents', font=font(44, True), fill='white')
-    draw.text((40, 86), f'Native Swift. iOS + Android. {count} runnable examples.', font=font(24), fill='#bcd9ff')
-    screens = [(ios, 'muscle-linear-gradient.png', 'iOS / Muscle Map'),
-               (android, 'android-muscle-linear-gradient.png', 'Android / Skip Fuse'),
-               (ios, 'muscle-map-regions.png', 'iOS / Body regions'),
-               (android, 'android-muscle-map-regions.png', 'Android / Body regions')]
-    for index, (directory, filename, label) in enumerate(screens):
-        x = 40 + index * 306
-        draw.text((x, 138), label, font=font(17, True), fill='#e6f0ff')
-        capture = Image.open(directory / filename).convert('RGB')
-        preview = ImageOps.contain(capture, (282, 628), Image.Resampling.LANCZOS)
-        draw.rounded_rectangle((x - 3, 174, x + preview.width + 3, 180 + preview.height), radius=18, fill='#8293b0')
-        canvas.paste(preview, (x, 177))
-    save(canvas, output)
-
-
 def day_parity(ios, android, output):
     canvas = Image.new('RGB', (880, 440), '#f4f7fc')
     draw = ImageDraw.Draw(canvas)
@@ -148,9 +129,8 @@ def main():
     for side in ('Front', 'Back'):
         anatomy = [entry for entry in entries if entry['category'] == side + ' anatomical shapes']
         gallery(anatomy, args.ios, args.android, args.output / (side.lower() + '-muscle-atlas-gallery.png'), side + ': all 16 anatomical vectors')
-    hero(args.ios, args.android, args.output / 'hero.png', len(entries))
     day_parity(args.ios, args.android, args.output / 'default-day-parity.png')
-    print('Prepared ' + str(len(entries) * 2) + ' screenshots and five galleries')
+    print('Prepared ' + str(len(entries) * 2) + ' screenshots and four galleries')
 
 
 if __name__ == '__main__':
