@@ -13,10 +13,11 @@ extension Binding where Value == ClosedRange<Date>? {
         let read: @MainActor () -> TimeRange? = {
             wrappedValue.map { TimeRange(start: $0.lowerBound, end: $0.upperBound) }
         }
+        // Passing the actor-isolated getter directly crashes Swift 6.3 during IR generation.
         #if os(Android)
-        return Binding<TimeRange?>(get: read, set: { range in write(range, to: self) })
+        return Binding<TimeRange?>(get: { read() }, set: { range in write(range, to: self) })
         #else
-        return Binding<TimeRange?>(get: read, set: { range, transaction in
+        return Binding<TimeRange?>(get: { read() }, set: { range, transaction in
             // Forward explicitly to the source binding as well as its observable owner.
             withTransaction(transaction) { write(range, to: self.transaction(transaction)) }
         })
