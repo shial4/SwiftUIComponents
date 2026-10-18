@@ -30,6 +30,19 @@ struct KeyPathBindingExampleView: View {
                     Text(settings.label).font(.title3.bold())
                     Text(settings.enabled ? "Dashboard enabled" : "Dashboard disabled")
                         .foregroundStyle(settings.enabled ? .blue : .secondary)
+                    Capsule().fill(.blue)
+                        .frame(width: settings.enabled ? 240 : 60, height: 24)
+                    Button("Animate dashboard") {
+                        let binding = Binding(for: \.enabled, on: settings)
+                        #if os(Android)
+                        // Skip Fuse supports withAnimation, but not Binding.animation yet.
+                        withAnimation(.easeInOut(duration: 1)) { binding.wrappedValue.toggle() }
+                        #else
+                        binding.animation(.easeInOut(duration: 1)).wrappedValue.toggle()
+                        #endif
+                    }.buttonStyle(.bordered)
+                    Text("The toggle changes immediately. The button animates the same binding.")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
                 ExampleCode(code: "Toggle(\"Enabled\", isOn: Binding(for: \\.enabled, on: settings))\nTextField(\"Title\", text: Binding.create(for: \\.label, on: settings))")
             }.padding()

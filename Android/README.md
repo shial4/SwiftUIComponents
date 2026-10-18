@@ -55,6 +55,7 @@ Typography, native controls, scrolling and accessibility grouping follow each pl
 | Transform transition | Translation, rotation and independent scales | Translation and uniform scale |
 | Muscle Map accessibility | Named selection actions | Shared region toggles and Compose semantics |
 | Codable storage | UserDefaults | SharedPreferences through AndroidUserDefaults |
+| Computed binding transactions | Preserve caller animation and transaction metadata | Writes work; SkipFuseUI 1.19 does not expose binding transactions or `withTransaction` |
 
 The `CodableStorage` alias supplies the platform store type for `store:`. Font compression in weekday headers and Xcode previews are Apple-only.
 

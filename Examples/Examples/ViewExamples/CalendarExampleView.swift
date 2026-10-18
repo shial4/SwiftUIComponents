@@ -3,7 +3,7 @@ import SwiftUIComponents
 
 struct CalendarExampleView: View {
     @State var date = Date()
-    @State var selection: TimeRange?
+    @State var selection: ClosedRange<Date>?
     @State var mode = 1
     @State var multiple = true
     @State var selectionEnabled = true
@@ -50,7 +50,7 @@ struct CalendarExampleView: View {
                     }
                 } else { configuredCalendar }
                 if let selection {
-                    Text("\(selection.start, format: .dateTime.day().month()) - \(selection.end, format: .dateTime.day().month())")
+                    Text("\(selection.lowerBound, format: .dateTime.day().month()) - \(selection.upperBound, format: .dateTime.day().month())")
                     Text("\(selection.toArray(calendar: calendar).count) selected calendar days")
                 } else { Text("Tap a day, then another day to select a range. Drag across days to extend it.") }
                 Button("Clear selection") { selection = nil }

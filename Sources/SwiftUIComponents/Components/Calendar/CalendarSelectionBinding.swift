@@ -3,14 +3,24 @@ import SwiftUI
 @MainActor
 extension Binding where Value == ClosedRange<Date>? {
     var timeRange: Binding<TimeRange?> {
-        Binding<TimeRange?>(
-            get: { wrappedValue.map { TimeRange(start: $0.lowerBound, end: $0.upperBound) } },
-            set: { range in
-                if let range, range.start <= range.end {
-                    wrappedValue = range.start...range.end
-                } else { wrappedValue = nil }
+        func write(_ range: TimeRange?, to binding: Binding<ClosedRange<Date>?>) {
+            if let range, range.start <= range.end {
+                binding.wrappedValue = range.start...range.end
+            } else {
+                binding.wrappedValue = nil
             }
-        )
+        }
+        let read: @MainActor () -> TimeRange? = {
+            wrappedValue.map { TimeRange(start: $0.lowerBound, end: $0.upperBound) }
+        }
+        #if os(Android)
+        return Binding<TimeRange?>(get: read, set: { range in write(range, to: self) })
+        #else
+        return Binding<TimeRange?>(get: read, set: { range, transaction in
+            // Forward explicitly to the source binding as well as its observable owner.
+            withTransaction(transaction) { write(range, to: self.transaction(transaction)) }
+        })
+        #endif
     }
 }
 

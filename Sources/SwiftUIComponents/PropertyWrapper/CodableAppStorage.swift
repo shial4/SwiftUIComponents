@@ -34,7 +34,7 @@ public struct CodableAppStorage<Value: Codable>: DynamicProperty {
     }
 
     public var projectedValue: Binding<Value> {
-        Binding(get: { wrappedValue }, set: { wrappedValue = $0 })
+        Binding.preservingTransaction(get: { wrappedValue }, set: { wrappedValue = $0 })
     }
 }
 

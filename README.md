@@ -45,12 +45,12 @@ Swift 6.3 or later.
 
 ## Install
 
-In Xcode, choose **File > Add Package Dependencies**, enter `https://github.com/shial4/SwiftUIComponents.git`, choose **Up to Next Major Version** starting at **1.0.2**, and add the **SwiftUIComponents** library to your target.
+In Xcode, choose **File > Add Package Dependencies**, enter `https://github.com/shial4/SwiftUIComponents.git`, choose **Up to Next Major Version** starting at **1.0.3**, and add the **SwiftUIComponents** library to your target.
 
 Or add the package to `Package.swift`:
 
 ```swift
-.package(url: "https://github.com/shial4/SwiftUIComponents.git", from: "1.0.2")
+.package(url: "https://github.com/shial4/SwiftUIComponents.git", from: "1.0.3")
 ```
 
 Then add its product to your target's dependencies:
@@ -903,6 +903,8 @@ TextField("Title", text: Binding.create(for: \.label, on: settings))
 ```
 
 The example uses an `@Observable` reference owner. Import `SkipFuse` in a Fuse module to enable its Android observation bridge. Both binding APIs operate on the main actor.
+
+On Apple platforms, these bindings preserve the caller's animation transaction, including `Binding.animation(_:)` and `withAnimation` updates. Calendar range adapters and Codable storage bindings preserve transactions too. Skip Fuse currently supports the writes but does not expose binding transaction metadata; see [platform behavior](Android/README.md#platform-behavior).
 
 </details>
 
