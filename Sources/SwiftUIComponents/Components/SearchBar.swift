@@ -4,6 +4,7 @@ import SwiftUI
 public struct SearchBar: View {
     @Binding var text: String
     @FocusState var isFocused: Bool
+    @State var inputID = UUID()
     private let prompt: String
 
     public init(text: Binding<String>, prompt: String = "Search...") {
@@ -12,9 +13,16 @@ public struct SearchBar: View {
     }
 
     public var body: some View {
-        TextField(prompt, text: $text)
+        let currentInputID = inputID
+        let inputText = Binding(get: { text }, set: { value in
+            // A dismissed keyboard can commit its composition after Clear.
+            guard inputID == currentInputID else { return }
+            text = value
+        })
+        return TextField(prompt, text: inputText)
             .textFieldStyle(.plain)
             .focused($isFocused)
+            .id(inputID)
             .padding(10)
             .padding(.trailing, isFocused ? 28 : 0)
             .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
@@ -22,7 +30,8 @@ public struct SearchBar: View {
             .overlay(alignment: .trailing) {
                 if isFocused {
                     Button("Clear search", systemImage: "xmark") {
-                        // Let the native editor commit before resetting its binding.
+                        // Retire the old editor before dismissing its keyboard.
+                        inputID = UUID()
                         isFocused = false
                         componentDismissKeyboard()
                         text = ""
