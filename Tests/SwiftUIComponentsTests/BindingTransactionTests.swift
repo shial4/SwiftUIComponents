@@ -14,6 +14,42 @@ private struct BindingTransactionKey: TransactionKey {
 
 @Suite("Binding transactions")
 struct BindingTransactionTests {
+    @MainActor @Test("Search input forwards transactions and rejects commits from a cleared editor")
+    func searchInputTransaction() throws {
+        var text = ""
+        var received: [Transaction] = []
+        var editorID = UUID()
+        let source = Binding(get: { text }, set: { value, transaction in
+            text = value
+            received.append(transaction)
+        })
+        func editor() -> Binding<String> {
+            let id = editorID
+            return SearchBar.inputBinding(source, isCurrent: { editorID == id })
+        }
+        var transaction = Transaction(animation: .linear(duration: 0.6))
+        transaction.disablesAnimations = true
+        transaction[BindingTransactionKey.self] = 42
+        let original = editor()
+        original.transaction(transaction).wrappedValue = "query"
+        #expect(text == "query")
+        let forwarded = try #require(received.first)
+        #expect(forwarded.animation == transaction.animation)
+        #expect(forwarded.disablesAnimations)
+        #expect(forwarded[BindingTransactionKey.self] == 42)
+
+        editorID = UUID()
+        text = ""
+        original.transaction(transaction).wrappedValue = "late keyboard commit"
+        #expect(text.isEmpty && received.count == 1)
+        let current = editor()
+        current.transaction(transaction).wrappedValue = "fresh query"
+        #expect(text == "fresh query" && received.count == 2)
+        // Programmatic updates remain visible to the currently mounted field.
+        text = "external update"
+        #expect(current.wrappedValue == text)
+    }
+
     @MainActor @Test("Calendar range conversion forwards the complete transaction", arguments: [0, 1, 2])
     func calendarTransaction(input: Int) throws {
         let start = Date(timeIntervalSince1970: 1_700_000_000)

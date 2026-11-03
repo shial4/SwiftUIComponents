@@ -14,11 +14,7 @@ public struct SearchBar: View {
 
     public var body: some View {
         let currentInputID = inputID
-        let inputText = Binding(get: { text }, set: { value in
-            // A dismissed keyboard can commit its composition after Clear.
-            guard inputID == currentInputID else { return }
-            text = value
-        })
+        let inputText = Self.inputBinding($text, isCurrent: { inputID == currentInputID })
         return TextField(prompt, text: inputText)
             .textFieldStyle(.plain)
             .focused($isFocused)
@@ -42,5 +38,21 @@ public struct SearchBar: View {
                     .padding(.trailing, 10)
                 }
             }
+    }
+
+    static func inputBinding(_ source: Binding<String>, isCurrent: @escaping @MainActor () -> Bool) -> Binding<String> {
+        func write(_ value: String, to binding: Binding<String>) {
+            // A dismissed keyboard can commit its composition after Clear.
+            guard isCurrent() else { return }
+            binding.wrappedValue = value
+        }
+        #if os(Android)
+        // SkipFuseUI does not expose transaction-aware binding setters.
+        return Binding(get: { source.wrappedValue }, set: { write($0, to: source) })
+        #else
+        return Binding(get: { source.wrappedValue }, set: { value, transaction in
+            withTransaction(transaction) { write(value, to: source.transaction(transaction)) }
+        })
+        #endif
     }
 }
