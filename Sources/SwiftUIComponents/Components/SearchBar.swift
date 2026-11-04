@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// An inline search field with a clear-and-dismiss button while focused.
+/// An inline search field with a clear-and-dismiss button while focused or nonempty.
 public struct SearchBar: View {
     @Binding var text: String
     @FocusState var isFocused: Bool
@@ -15,16 +15,17 @@ public struct SearchBar: View {
     public var body: some View {
         let currentInputID = inputID
         let inputText = Self.inputBinding($text, isCurrent: { inputID == currentInputID })
+        let showsClear = isFocused || !text.isEmpty
         return TextField(prompt, text: inputText)
             .textFieldStyle(.plain)
             .focused($isFocused)
             .id(inputID)
             .padding(10)
-            .padding(.trailing, isFocused ? 28 : 0)
+            .padding(.trailing, showsClear ? 28 : 0)
             .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
             .accessibilityLabel(Text(prompt))
             .overlay(alignment: .trailing) {
-                if isFocused {
+                if showsClear {
                     Button("Clear search", systemImage: "xmark") {
                         // Retire the old editor before dismissing its keyboard.
                         inputID = UUID()
