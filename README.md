@@ -582,7 +582,9 @@ Reports raw drag distance in points and resets the binding to zero on release. T
 SearchBar(text: $query, prompt: "Find a component")
 ```
 
-Bind the query to your own filtering logic. The inline field includes a clear-and-dismiss action while focused.
+Bind the query to your own filtering logic. Clear remains available while the field
+is focused or contains a query, including after the keyboard closes. It clears the
+query and dismisses editing without allowing a late keyboard commit to restore text.
 
 ### Every general-purpose shape
 
