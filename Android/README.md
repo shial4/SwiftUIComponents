@@ -38,7 +38,7 @@ Native Android tests need a host that packages both the Swift test library and i
 
 The catalogue pins SkipUI 1.66.3 and SkipFuseUI 1.19.4. These releases include the [path containment fix](https://github.com/skiptools/skip-ui/pull/593) and [drag-release endpoint fix](https://github.com/skiptools/skip-ui/pull/592).
 
-The [main-actor test startup](https://github.com/skiptools/skipstone/pull/311), [test manifest discovery](https://github.com/skiptools/skipstone/pull/317), and [symlink discovery](https://github.com/skiptools/skipstone/pull/318) fixes are merged upstream but not included in Skip 1.9.20. The [UserDefaults projection fix](https://github.com/skiptools/skip-android-bridge/pull/44) is still awaiting merge and release. Native Android logic-test verification with the stock runner remains pending these updates; the package does not pin unpublished patches. Adopt the released CLI/plugin and bridge fix together, synchronize both lockfiles, then rerun logic, UI and memory checks.
+Native Android logic-test verification is incomplete with the pinned Skip 1.9.20 toolchain and bridge versions. Relevant upstream fixes cover [main-actor test startup](https://github.com/skiptools/skipstone/pull/311), [test manifest discovery](https://github.com/skiptools/skipstone/pull/317), [symlink discovery](https://github.com/skiptools/skipstone/pull/318), and [UserDefaults projection](https://github.com/skiptools/skip-android-bridge/pull/44). The package does not pin unpublished patches. A follow-up dependency update should adopt releases containing these fixes together, synchronize both lockfiles, then rerun logic, UI and memory checks.
 
 With those fixes available and a matching native toolchain configured, generate the bridges and run the native test module:
 
@@ -77,7 +77,7 @@ The script requires a newly written accessibility snapshot for every observation
 
 The calendar release regression sends the final finger position only in the touch-up event and checks that the selected range includes that day. SkipUI 1.66.3 contains the upstream fix; keep this check enabled to catch regressions.
 
-The cross-month year-grid drag after scrolling is still a failing Android UI check with the pinned dependencies: selection can stop before the intended end date. The strict 38-day assertion remains enabled. This issue is not resolved by the released touch-up fix, and 1.0.7 remains untagged pending release review.
+The cross-month year-grid drag after scrolling remains a known limitation in 1.0.7: selection can stop before the intended end date. Incorrect range selection was also reproduced in the official 1.0.6 APK, but an identical underlying cause has not been established. The current build passes a fast continuous drag and fails a slower drag with valid touch timestamps. Restoring the old gesture attachment does not fix that failure. The strict 38-day assertion remains enabled; this release does not claim a fully passing Android UI suite or a fix for this interaction.
 
 ## Platform behavior
 
