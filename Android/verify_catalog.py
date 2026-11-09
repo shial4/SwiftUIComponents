@@ -437,8 +437,10 @@ def verify_calendar(catalogue):
     center = catalogue.center
 
     def square_cells(nodes, clipped_edges=()):
-        # Android accessibility bounds clip partially visible rows to the scroll viewport.
-        return bool(nodes) and all(abs((right - left) - (bottom - top)) <= 1 or
+        # Accessibility reports physical pixels. Use a one-point tolerance for
+        # Compose's pixel distribution, also present in the released catalogue.
+        # Partially visible rows remain limited to the actual scroll viewport edges.
+        return bool(nodes) and all(abs((right - left) - (bottom - top)) <= max(1, density) or
                                    (bottom - top < right - left and
                                     (top in clipped_edges or bottom in clipped_edges))
                                    for left, top, right, bottom in map(catalogue.bounds, nodes))
@@ -536,6 +538,9 @@ def verify_calendar_state(catalogue):
     catalogue.switch("Custom day cells")
     check("custom day and header styling preserves the exact selected range", summary() == selected)
     catalogue.tap("Year")
+    check("custom year grid finishes rendering before scrolling", catalogue.wait_for(
+        lambda nodes: any(n.get("text") == "January" for n in nodes)
+        and any(n.get("scrollable") == "true" for n in nodes), timeout=15))
     nodes = catalogue.nodes()
     marker = catalogue.calendar_days(nodes)[0]
     marker_label = marker.get("content-desc")
