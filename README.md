@@ -16,7 +16,7 @@
 
 Build calendars, highlight workouts and scroll through content-sized cards. Browse runnable examples with code and real results from both platforms.
 
-Android compatibility is provided by [Skip Fuse](https://skip.dev/docs/modules/skip-fuse-ui/), which compiles the shared Swift and SwiftUI natively for Android.
+Android compatibility is provided by [Skip Fuse](https://skip.dev/docs/modules/skip-fuse-ui/), which compiles the shared Swift and SwiftUI natively for Android. The catalogue pins SkipUI 1.66.3 and SkipFuseUI 1.19.4; see [platform behavior and test-runner limits](Android/README.md#shared-logic-tests).
 
 [Install](#install) | [Components](#component-catalogue) | [Run examples](#run-the-examples) | [Build and test](#build-and-test)
 
@@ -45,12 +45,12 @@ Swift 6.3 or later.
 
 ## Install
 
-In Xcode, choose **File > Add Package Dependencies**, enter `https://github.com/shial4/SwiftUIComponents.git`, choose **Up to Next Major Version** starting at **1.0.3**, and add the **SwiftUIComponents** library to your target.
+In Xcode, choose **File > Add Package Dependencies**, enter `https://github.com/shial4/SwiftUIComponents.git`, choose **Up to Next Major Version** starting at **1.0.7**, and add the **SwiftUIComponents** library to your target.
 
 Or add the package to `Package.swift`:
 
 ```swift
-.package(url: "https://github.com/shial4/SwiftUIComponents.git", from: "1.0.3")
+.package(url: "https://github.com/shial4/SwiftUIComponents.git", from: "1.0.7")
 ```
 
 Then add its product to your target's dependencies:
@@ -363,7 +363,7 @@ CalendarView(
 
 Custom builders retain the period, calendar and selection options. Use `.headerView`, `.weekdaysView` and `.dayView`, or the public generic initializer for fully custom content. Provide a `CalendarColorSet` to customize default colors. `DefaultCalendarView` wraps the default builders; `CalendarContentView` displays only the grid. The default header, day and weekday views are also usable separately.
 
-A tap starts a selection; a second distinct tap extends a single-day selection into a range. Tapping a selected day or an existing multi-day range clears it. With multiselection disabled, tapping another day replaces the selection. Dragging grows a range. `TimeRange.toArray(calendar:)` returns inclusive calendar days; reversed ranges are empty.
+A tap starts a selection; a second distinct tap extends a single-day selection into a range. Tapping a selected day or an existing multi-day range clears it. With multiselection disabled, tapping another day replaces the selection. Drag across days to grow a range; use the gaps or month headings to scroll a year view without changing the selection. With range selection disabled, dragging over days also scrolls the containing view. `TimeRange.toArray(calendar:)` returns inclusive calendar days; reversed ranges are empty.
 
 #### Standalone calendar building blocks
 
@@ -492,7 +492,7 @@ Each row wraps to the available width and determines its own height. Changing it
 
 Cells use index identity. For data that can be reordered, use native `ForEach(items)` with stable model IDs. On Android, place the list in a non-scrolling parent such as `VStack`; nesting scroll containers on the same axis is unsupported.
 
-**Large jumps:** on Apple platforms, distant requests first resolve a small range near the destination. Wrap the request in `withAnimation` to animate the final approach using the caller's animation. Immediate requests use the same bounded path without animation. The list checks that the destination stays visible as lazy size estimates settle. Visibility reports update after layout, without briefly reporting an empty list during a jump. New requests, data removal and native dragging cancel pending corrections. The [rendering tests](Tests/SwiftUIComponentsTests/DynamicListRenderingTests.swift) check stable target visibility, distinct callbacks and bounded cell construction in 10,000-cell lists on both axes.
+**Large jumps:** on Apple platforms, distant requests first resolve a small range near the destination. Wrap the request in `withAnimation` to animate the final approach using the caller's animation. Immediate requests use the same bounded path without animation. The list checks that the destination stays visible as lazy size estimates settle. Visibility reports update after layout, without briefly reporting an empty list during a jump. New requests, data removal and native dragging cancel pending corrections. The [rendering tests](Tests/Rendering/DynamicListRenderingTests.swift) check stable target visibility, distinct callbacks and bounded cell construction in 10,000-cell lists on both axes.
 
 **Android timing:** Skip currently controls the native scroll animation. Large animated jumps can take several seconds, and the caller's duration and curve are not forwarded. That renderer limitation remains separate from the Apple jump fix; see [platform behavior](Android/README.md#platform-behavior). The example includes a **Use 10,000 cells** button to try distant jumps.
 

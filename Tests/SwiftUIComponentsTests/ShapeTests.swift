@@ -4,22 +4,24 @@ import Testing
 
 @Suite("Shape geometry")
 struct ShapeTests {
-    @Test("Continuous shape dimensions interpolate through the Shape contract")
-    func continuousShapeAnimation() {
-        func midpoint<S: Shape>(_ start: S, _ end: S) -> S {
-            var result = start
-            var change = end.animatableData - start.animatableData
-            change.scale(by: 0.5)
-            result.animatableData += change
-            return result
+    @MainActor @Test("Transformed hit regions preserve pixel distances and edge tolerance",
+                     arguments: [CGSize(width: 100, height: 400), CGSize(width: 500, height: 80)])
+    func transformedHitRegions(size: CGSize) {
+        let rect = CGRect(origin: CGPoint(x: 31, y: -17), size: size)
+        let shapes: [any MuscleMapShape] = [MuscleMap.Front.Biceps(translationX: 5),
+                                           MuscleMap.Back.TeresMajor(translationX: -5.2)]
+        for shape in shapes {
+            let region = shape.hitRegion(in: rect)
+            let reference = MuscleMapHitRegion(polygons: region.polygons)
+            for x in stride(from: rect.minX - 10, through: rect.maxX + 10, by: 7.0) {
+                for y in stride(from: rect.minY - 10, through: rect.maxY + 10, by: 7.0) {
+                    let point = CGPoint(x: x, y: y)
+                    #expect(region.contains(point) == reference.contains(point))
+                    #expect(abs(region.distance(to: point) - reference.distance(to: point)) < 0.000001)
+                    #expect(region.distance(to: point, maximum: 3) == reference.distance(to: point, maximum: 3))
+                }
+            }
         }
-
-        #expect(abs(midpoint(Chevron(thickness: 0.1), Chevron(thickness: 0.4)).thickness - 0.25) < 0.000001)
-        #expect(abs(midpoint(Tick(thickness: 0.1), Tick(thickness: 0.4)).thickness - 0.25) < 0.000001)
-        let corner = midpoint(RoundedCorner(radius: 0, corners: [.topLeft]),
-                              RoundedCorner(radius: 40, corners: [.topLeft]))
-        #expect(corner.radius == 20)
-        #expect(corner.corners == [.topLeft])
     }
 
     @Test("Bounded hit distances preserve corners, edges and disjoint polygons")

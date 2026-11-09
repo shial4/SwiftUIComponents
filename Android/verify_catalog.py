@@ -21,9 +21,13 @@ class Catalogue:
     def run(self, *args):
         return subprocess.check_output(self.adb + list(args), stderr=subprocess.DEVNULL)
 
-    def nodes(self):
+    def nodes(self, fail_on_error=True):
         self.run("shell", "uiautomator", "dump", "/sdcard/components.xml")
         root = ET.fromstring(self.run("shell", "cat", "/sdcard/components.xml"))
+        if any(n.get("resource-id") == "android:id/aerr_close" for n in root.iter("node")):
+            if fail_on_error:
+                raise AssertionError("Android reported an application crash or not-responding dialog")
+            return []
         # A launcher icon with the same label must never count as a rendered demo.
         return [n for n in root.iter("node") if n.get("package") == APP]
 
@@ -41,12 +45,18 @@ class Catalogue:
         time.sleep(0.4)
 
     def tap(self, label):
-        for node in self.nodes():
-            if (node.get("class") != "android.widget.EditText"
-                    and label in (node.get("text"), node.get("content-desc"))):
-                self.tap_node(node)
-                return
+        nodes = self.nodes()
+        # Prefer visible labels: the muscle-map "Back" picker shares its label
+        # with the navigation button's accessibility description.
+        for attribute in ("text", "content-desc"):
+            for node in nodes:
+                if node.get("class") != "android.widget.EditText" and node.get(attribute) == label:
+                    self.tap_node(node)
+                    return
         raise AssertionError("Missing control: " + label)
+
+    def back(self):
+        self.tap_node(next(n for n in self.nodes() if n.get("content-desc") == "Back"))
 
     def switch(self, label):
         nodes = self.nodes()
@@ -66,16 +76,30 @@ class Catalogue:
         self.run("shell", "am", "start", "-f", "0x10008000", "-n", ACTIVITY)
         # Reset the activity task, preserving SharedPreferences for restart checks.
         for _ in range(4):
-            nodes = self.nodes()
+            # A previous process's error dialog can outlive force-stop briefly.
+            # Still require a real catalogue root before allowing any interaction.
+            nodes = self.nodes(fail_on_error=False)
             if any(n.get("text") == "SwiftUI Components" for n in nodes):
                 return nodes
             time.sleep(0.2)
         raise AssertionError("Catalogue root did not render after launch")
 
-    def open(self, demo):
-        root = self.launch()
+    def open(self, demo, restart=True):
+        root = self.launch() if restart else self.nodes()
+        if not restart and any(n.get("content-desc") == "Back" for n in root):
+            self.back()
+            check("navigation returns to catalogue", self.wait_for(
+                lambda nodes: any(n.get("text") == "SwiftUI Components" for n in nodes)))
+            root = self.nodes()
         field = next(n for n in root if n.get("class") == "android.widget.EditText")
         self.tap_node(field)
+        if field.get("text"):
+            self.tap("Clear search")
+            check("catalogue search clears before opening another route", self.wait_for(
+                lambda nodes: any(n.get("class") == "android.widget.EditText"
+                                  and not n.get("text") and n.get("focused") == "false" for n in nodes)))
+            field = next(n for n in self.nodes() if n.get("class") == "android.widget.EditText")
+            self.tap_node(field)
         self.run("shell", "input", "text", demo.replace(" ", "%s"))
         # Back leaves the activity when the software keyboard has not opened.
         keyboard = self.run("shell", "dumpsys", "input_method").decode()
@@ -138,9 +162,9 @@ class Catalogue:
         self.run("shell", "input", "swipe", str(x1), str(y1), str(x2), str(y2), str(duration))
         time.sleep(0.5)
 
-    def drag(self, x1, y1, x2, y2):
-        # Like the iOS UI test, hold the exact endpoint before lifting. `input
-        # swipe` can deliver that endpoint only as touch-up, after the last move.
+    def drag(self, x1, y1, x2, y2, release=None):
+        # Hold the last MOVE before lifting. An explicit release position tests
+        # coordinates delivered only at touch-up, as with coalesced move events.
         self.run("shell", "input", "motionevent", "DOWN", str(x1), str(y1))
         try:
             time.sleep(0.2)
@@ -151,7 +175,8 @@ class Catalogue:
                 time.sleep(0.045)
             time.sleep(0.4)
         finally:
-            self.run("shell", "input", "motionevent", "UP", str(x2), str(y2))
+            end_x, end_y = release if release is not None else (x2, y2)
+            self.run("shell", "input", "motionevent", "UP", str(end_x), str(end_y))
         time.sleep(0.5)
 
 
@@ -370,6 +395,43 @@ def verify_progress(catalogue):
     check("progress slider updates its percentage", any(40 <= int(p[:-1]) <= 60 for p in percentages))
 
 
+def verify_joystick(catalogue):
+    catalogue.open("Joystick")
+    for horizontal, vertical in ((1, 1), (-1, -1)):
+        target = next(n for n in catalogue.nodes() if n.get("content-desc", "").startswith("Joystick"))
+        left, top, right, bottom = catalogue.bounds(target)
+        x, y = catalogue.center(target)
+        end_x = x + horizontal * (right - left) // 4
+        end_y = y + vertical * (bottom - top) // 4
+        catalogue.run("shell", "input", "motionevent", "DOWN", str(x), str(y))
+        try:
+            for step in range(1, 5):
+                catalogue.run("shell", "input", "motionevent", "MOVE",
+                              str(x + (end_x - x) * step // 4), str(y + (end_y - y) * step // 4))
+                time.sleep(0.1)
+            texts = [n.get("text", "") for n in catalogue.nodes()]
+            value = next(re.fullmatch(r"x: (-?[\d.]+), y: (-?[\d.]+) points", text)
+                         for text in texts if text.startswith("x: "))
+            check("joystick drag updates both translation axes", value is not None
+                  and float(value[1]) * horizontal > 0 and float(value[2]) * vertical > 0)
+        finally:
+            catalogue.run("shell", "input", "motionevent", "UP", str(end_x), str(end_y))
+        check("joystick release resets its binding", catalogue.wait_for(
+            lambda nodes: any(n.get("text") == "x: 0.0, y: 0.0 points" for n in nodes)))
+
+
+def verify_badges(catalogue):
+    catalogue.open("Badges")
+    for command, count in (("Increment", 6), ("Decrement", 5)):
+        catalogue.tap(command)
+        nodes = catalogue.nodes()
+        check("badge count follows its control", any(n.get("text") == str(count) for n in nodes)
+              and any(n.get("text") == f"Count: {count}" for n in nodes))
+    check("badge labels preserve their full text",
+          {"Top left", "Top right", "Bottom left", "Bottom right", "999+"}
+          <= {n.get("text") for n in nodes})
+
+
 def verify_calendar(catalogue):
     days = catalogue.calendar_days
     center = catalogue.center
@@ -425,14 +487,13 @@ def verify_calendar(catalogue):
     catalogue.open("CalendarContentView")
     catalogue.tap("Year")
     first = last = None
-    for _ in range(8):
-        cells = days()
+    def adjacent_months_ready(nodes):
+        nonlocal first, last
+        cells = days(nodes)
         first = next((n for n in cells if re.search(r", 5 January \d{4}$", n.get("content-desc", ""))), None)
         last = next((n for n in cells if re.search(r", 11 February \d{4}$", n.get("content-desc", ""))), None)
-        if first is not None and last is not None:
-            break
-        time.sleep(0.2)
-    check("year calendar exposes dates across adjacent months", first is not None and last is not None)
+        return first is not None and last is not None
+    check("year calendar exposes dates across adjacent months", catalogue.wait_for(adjacent_months_ready, timeout=15))
     # Scroll between month columns so the page moves without starting a range.
     # Drag selection must use the new row positions even when days do not redraw.
     original_top = catalogue.bounds(first)[1]
@@ -451,7 +512,8 @@ def verify_calendar(catalogue):
           and catalogue.bounds(first)[1] < original_top)
     check("scrolling between months preserves the selection", catalogue.has_text("Selected days: 0"))
     catalogue.drag(*center(first), *center(last))
-    check("calendar drag crosses month boundaries after scrolling", catalogue.has_text("Selected days: 38"))
+    check("calendar drag crosses month boundaries after scrolling", catalogue.wait_for(
+        lambda nodes: any(n.get("text") == "Selected days: 38" for n in nodes), timeout=15))
 
 
 def verify_calendar_state(catalogue):
@@ -468,10 +530,30 @@ def verify_calendar_state(catalogue):
     catalogue.tap("Week")
     catalogue.tap_node(catalogue.calendar_days()[1])
     catalogue.tap_node(catalogue.calendar_days()[3])
+    check("calendar establishes a three-day range", catalogue.wait_for(
+        lambda nodes: any(n.get("text") == "3 selected calendar days" for n in nodes)))
     selected = summary()
-    check("calendar establishes a three-day range", selected[1] == "3 selected calendar days")
     catalogue.switch("Custom day cells")
     check("custom day and header styling preserves the exact selected range", summary() == selected)
+    catalogue.tap("Year")
+    nodes = catalogue.nodes()
+    marker = catalogue.calendar_days(nodes)[0]
+    marker_label = marker.get("content-desc")
+    marker_top = catalogue.bounds(marker)[1]
+    scroll = next(n for n in nodes if n.get("scrollable") == "true")
+    left, top, right, bottom = catalogue.bounds(scroll)
+    middle = (left + right) // 2
+    low, high = top + (bottom - top) * 3 // 4, top + (bottom - top) // 2
+    catalogue.swipe(middle, low, middle, high, duration=1000)
+    moved = next((n for n in catalogue.calendar_days() if n.get("content-desc") == marker_label), None)
+    check("custom year grid leaves its month gutter available for scrolling",
+          moved is None or catalogue.bounds(moved)[1] < marker_top)
+    for _ in range(6):
+        if catalogue.has_text("Week"):
+            break
+        catalogue.swipe(middle, high, middle, low, duration=1000)
+    catalogue.tap("Week")
+    check("scrolling the custom year and restoring week mode preserves the exact range", summary() == selected)
     catalogue.tap("Next")
     check("calendar navigation preserves offscreen selected dates", summary() == selected)
     catalogue.tap("Previous")
@@ -496,6 +578,19 @@ def verify_calendar_state(catalogue):
     catalogue.tap("Clear selection")
     drag_days(1, 3)
     check("range dragging still works after style and mode changes", summary()[1] == "3 selected calendar days")
+
+
+def verify_calendar_release(catalogue):
+    catalogue.open("CalendarContentView")
+    days = catalogue.calendar_days()
+    # The final position may arrive only in ACTION_UP when moves are coalesced.
+    # Keep this strict: holding a final MOVE would conceal Skip's missing endpoint.
+    catalogue.drag(*catalogue.center(days[7]), *catalogue.center(days[8]),
+                   release=catalogue.center(days[10]))
+    selected = next((n.get("text") for n in catalogue.nodes()
+                     if n.get("text", "").startswith("Selected days:")), "missing selection")
+    check("calendar includes the release day when the last move stops earlier; observed " + selected,
+          selected == "Selected days: 4")
 
 
 def verify_muscle_map(catalogue, screenshots=None):
@@ -601,6 +696,8 @@ def verify(catalogue, screenshots):
     verify_rating(catalogue)
     verify_counting(catalogue)
     verify_progress(catalogue)
+    verify_joystick(catalogue)
+    verify_badges(catalogue)
 
     verify_search(catalogue)
     verify_dynamic_list(catalogue)
@@ -617,12 +714,89 @@ def verify(catalogue, screenshots):
     catalogue.open("Codable Storage")
     check("storage survives restart", catalogue.has_text("Details disabled"))
     catalogue.tap("Reset")
+    verify_calendar_release(catalogue)
     print("Android catalogue checks passed", flush=True)
+
+
+def verify_memory(catalogue, report, cycles):
+    """Record repeated navigation in one process; inspect trends, not a fixed MB limit."""
+    samples = []
+    catalogue.launch()
+    pid = catalogue.run("shell", "pidof", APP).decode().strip()
+
+    def sample(phase):
+        check("memory run preserves the app process", catalogue.run(
+            "shell", "pidof", APP).decode().strip() == pid)
+        memory = catalogue.run("shell", "dumpsys", "meminfo", APP).decode()
+        totals = re.search(r"TOTAL PSS:\s*(\d+)\s+TOTAL RSS:\s*(\d+)", memory)
+        if totals is None:
+            raise AssertionError("Missing process memory totals")
+        entry = {"phase": phase, "pid": pid, "pss_kib": int(totals[1]), "rss_kib": int(totals[2])}
+        for label, key in (("Native Heap", "native_allocated_kib"), ("Dalvik Heap", "java_allocated_kib")):
+            row = re.search(r"^\s*" + label + r"\s+([\d ]+)$", memory, re.MULTILINE)
+            if row is None:
+                raise AssertionError("Missing memory row: " + label)
+            entry[key] = int(row[1].split()[-2])
+        samples.append(entry)
+        report.parent.mkdir(parents=True, exist_ok=True)
+        report.write_text(json.dumps(samples, indent=2) + "\n")
+        print("MEMORY: " + json.dumps(entry), flush=True)
+
+    sample("initial catalogue")
+    for cycle in range(1, cycles + 1):
+        catalogue.open("Calendar", restart=False)
+        catalogue.tap("Week")
+        days = catalogue.calendar_days()
+        catalogue.tap_node(days[0])
+        catalogue.tap_node(days[2])
+        catalogue.switch("Custom day cells")
+        for style in ("Year", "Month", "Week"):
+            catalogue.tap(style)
+            # A mode tap can leave the previous accessibility tree visible while
+            # Compose builds the new grid. Measure completed navigation cycles.
+            def rendered(nodes):
+                has_months = any(n.get("text") == "January" for n in nodes)
+                days = len(catalogue.calendar_days(nodes))
+                if style == "Year":
+                    return has_months
+                return not has_months and (days >= 28 if style == "Month" else days == 21)
+            check("repeat calendar renders " + style, catalogue.wait_for(rendered, timeout=15))
+        check("repeat calendar navigation preserves selection", catalogue.has_text("3 selected calendar days"))
+
+        catalogue.open("DynamicList", restart=False)
+        catalogue.tap("Use 10,000 cells")
+        for command, target in (("End", 9999), ("Start", 0)):
+            catalogue.tap(command)
+            check("repeat large-list jump reaches " + str(target), catalogue.wait_for(
+                lambda nodes: any(n.get("resource-id") == f"dynamic-list-cell-{target}"
+                                  and catalogue.bounds(n)[2] > catalogue.bounds(n)[0]
+                                  and catalogue.bounds(n)[3] > catalogue.bounds(n)[1] for n in nodes)
+                and catalogue.visible_index_matches_cells(nodes), timeout=20))
+
+        catalogue.open("Muscle Map", restart=False)
+        for side in ("Front", "Back", "Both"):
+            catalogue.tap(side)
+        catalogue.back()
+        check("memory cycle returns to catalogue", catalogue.has_text("SwiftUI Components"))
+        sample("catalogue after cycle " + str(cycle))
+        # Native peers can be released after Java collection/finalization. Keep
+        # both readings instead of mistaking an immediate peak for retained use.
+        time.sleep(2)
+        sample("settled catalogue after cycle " + str(cycle))
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--serial", help="adb emulator/device serial")
     parser.add_argument("--screenshots", type=Path, help="optional screenshot output directory")
+    parser.add_argument("--memory-report", type=Path, help="record process memory across repeated navigation")
+    parser.add_argument("--memory-cycles", type=int, default=5, help="navigation cycles in the memory run (default: 5)")
+    parser.add_argument("--memory-only", action="store_true", help="run memory navigation without repeating the smoke suite")
     args = parser.parse_args()
-    verify(Catalogue(args.serial), args.screenshots)
+    if args.memory_cycles < 1 or (args.memory_only and args.memory_report is None):
+        parser.error("memory cycles must be positive and --memory-only requires --memory-report")
+    catalogue = Catalogue(args.serial)
+    if not args.memory_only:
+        verify(catalogue, args.screenshots)
+    if args.memory_report:
+        verify_memory(catalogue, args.memory_report, args.memory_cycles)

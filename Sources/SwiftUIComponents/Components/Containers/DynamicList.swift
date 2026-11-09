@@ -311,10 +311,7 @@ public struct DynamicList<Content: View>: View {
             }
             .scrollPosition($position)
             .onChange(of: visiblePointIDs) { oldIDs, ids in
-                if oldIDs.max() != ids.max() { visibleCellChange(ids.max()) }
-                if let initialPointOffset, viewport.length > 0 {
-                    scroll(to: initialPointOffset, proxy: proxy)
-                }
+                if oldIDs.min() != ids.min() { visibleCellChange(ids.min()) }
             }
             .onChange(of: scrollOffset) { _, value in
                 guard abs(value - viewport.offset) > 0.5 || !value.isFinite else { return }
@@ -375,13 +372,10 @@ public struct DynamicList<Content: View>: View {
         ForEach(0..<numberOfItems, id: \.self) { index in
             cell(at: index)
                 .id(index)
-                .onScrollVisibilityChange(threshold: 0.001) { visible in
-                    if visible {
-                        visiblePointIDs.insert(index)
-                    } else {
-                        visiblePointIDs.remove(index)
-                    }
-                }
+                .modifier(DynamicListCellVisibility(orientation: orientation) { visible in
+                    guard visiblePointIDs.contains(index) != visible else { return }
+                    if visible { visiblePointIDs.insert(index) } else { visiblePointIDs.remove(index) }
+                })
         }
     }
     #endif
@@ -508,12 +502,20 @@ struct DynamicListLengths: Equatable, Sendable {
     }
 
     init(_ lengths: [Double]) {
-        let values = lengths.map(Self.validLength)
-        let total = values.reduce(0, +)
-        self.values = total.isFinite ? values : []
+        // Valid inputs can share the caller's array storage. Copy only when a
+        // dimension needs sanitizing, and compute the total in the same pass.
+        var values = lengths
+        var total = 0.0
+        for index in values.indices {
+            let length = Self.validLength(values[index])
+            if length != values[index] { values[index] = length }
+            total += length
+            if !total.isFinite { values = []; total = 0; break }
+        }
+        self.values = values
         self.uniformLength = 0
-        self.count = total.isFinite ? values.count : 0
-        self.total = total.isFinite ? total : 0
+        self.count = values.count
+        self.total = total
     }
 
     subscript(index: Int) -> Double { values.isEmpty ? uniformLength : values[index] }
@@ -540,6 +542,7 @@ struct DynamicListCellVisibility: ViewModifier {
     let action: (Bool) -> Void
     @Environment(\.displayScale) var displayScale
     @State var isVisible = false
+    @State var isMounted = false
 
     func body(content: Content) -> some View {
         content
@@ -555,10 +558,18 @@ struct DynamicListCellVisibility: ViewModifier {
                 return length > 0 && min(start + length, limit) - max(start, 0) >= 1 / displayScale
             } action: { visible in
                 isVisible = visible
-                action(visible)
+                // A lazy cell can finish a geometry update after disappearing.
+                // Do not let that update restore an index from an old viewport.
+                if isMounted { action(visible) }
             }
-            .onAppear { action(isVisible) }
-            .onDisappear { action(false) }
+            .onAppear {
+                isMounted = true
+                action(isVisible)
+            }
+            .onDisappear {
+                isMounted = false
+                action(false)
+            }
     }
 }
 

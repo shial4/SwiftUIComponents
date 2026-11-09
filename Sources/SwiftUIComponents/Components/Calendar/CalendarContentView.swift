@@ -5,13 +5,15 @@ public struct CalendarContentView<Day: View>: View {
     @Binding private var selection: TimeRange?
     @State var width: Double = 0
     @State var rowGeometry = CalendarRowGeometry()
+    @State var gridCache = CalendarGridCache()
     private var isMultiselectionEnabled = true
     private var isSelectionEnabled = true
     private let type: CalendarType
     private let previewDate: Date
     private let calendar: Calendar
     private let dayView: (Date, Calendar, Bool, DaySelection?) -> Day
-    private let monthSpacing: Double = 8
+    // Keep the year gutter clear of the day controls' expanded touch targets.
+    private let monthSpacing: Double = 48
     private var yearColumns: Int {
         if case .yearly(let requested) = type { return min(12, max(1, requested)) }
         return 1
@@ -28,19 +30,11 @@ public struct CalendarContentView<Day: View>: View {
     }
 
     public var body: some View {
-        let periods = CalendarGrid(calendar: calendar).periods(containing: previewDate, type: type)
+        let periods = gridCache.snapshot(calendar: calendar, date: previewDate, type: type).periods
         let selectedDays = CalendarSelection(calendar: calendar).normalized(selection)
         return content(periods: periods, selectedDays: selectedDays)
+            .componentHitArea(Rectangle())
             .onGeometryChange(for: Double.self, of: { $0.size.width }) { if width != $0 { width = $0 } }
-            #if !os(tvOS)
-            .simultaneousGesture(DragGesture(minimumDistance: 0, coordinateSpace: .global)
-                .onChanged { value in
-                    guard hypot(value.translation.width, value.translation.height) >= 4 else { return }
-                    // Preserve the touch-down day when the first move crosses a cell.
-                    if selection == nil { extendSelection(at: value.startLocation, periods: periods) }
-                    extendSelection(at: value.location, periods: periods)
-                })
-            #endif
     }
 
     @ViewBuilder private func content(periods: [CalendarPeriod], selectedDays: TimeRange?) -> some View {
@@ -48,7 +42,7 @@ public struct CalendarContentView<Day: View>: View {
         let side = width > 0 ? monthWidth / Double(calendar.weekdaySymbols.count) : nil
         switch type {
         case .weekly, .monthly:
-            if let period = periods.first { grid(period, side: side, selectedDays: selectedDays) }
+            if let period = periods.first { grid(period, periods: periods, side: side, selectedDays: selectedDays) }
         case .yearly:
             let rows = (periods.count + yearColumns - 1) / yearColumns
             let monthLength: CGFloat? = width > 0 ? CGFloat(monthWidth) : nil
@@ -61,7 +55,7 @@ public struct CalendarContentView<Day: View>: View {
                                 Text(period.month.formatted(Date.FormatStyle(locale: calendar.locale ?? .current, calendar: calendar, timeZone: calendar.timeZone).month(.wide)))
                                     .font(.headline)
                                 DefaultWeekdaysHeaderView(headerTextColor: .secondary, calendar: calendar)
-                                grid(period, side: side, selectedDays: selectedDays)
+                                grid(period, periods: periods, side: side, selectedDays: selectedDays)
                             }
                             .frame(width: monthLength)
                             .frame(maxWidth: monthLength == nil ? .infinity : nil)
@@ -73,7 +67,7 @@ public struct CalendarContentView<Day: View>: View {
         }
     }
 
-    private func grid(_ period: CalendarPeriod, side: Double?, selectedDays: TimeRange?) -> some View {
+    private func grid(_ period: CalendarPeriod, periods: [CalendarPeriod], side: Double?, selectedDays: TimeRange?) -> some View {
         let columns = calendar.weekdaySymbols.count
         let rows = (period.dates.count + columns - 1) / columns
         // Each week row shares the size computed by the calendar container.
@@ -92,8 +86,17 @@ public struct CalendarContentView<Day: View>: View {
                 .id(id)
             }
         }
+        .buttonStyle(.plain)
+        .disabled(!isSelectionEnabled)
+        .environment(\.calendarDaySize, side)
         .frame(maxWidth: .infinity)
         .id(period.id)
+        #if !os(tvOS)
+        // Start range gestures on days, leaving month headings and gaps available for scrolling.
+        .componentRangeGesture(minimumDistance: 4, isEnabled: isSelectionEnabled && isMultiselectionEnabled) { value in
+            extendSelection(from: value.startLocation, to: value.location, periods: periods)
+        }
+        #endif
     }
 
     private func dayCell(_ date: Date, month: Date, side: Double?, selectedDays: TimeRange?) -> some View {
@@ -103,15 +106,18 @@ public struct CalendarContentView<Day: View>: View {
             selection = CalendarSelection(calendar: calendar).tapping(date, selection: selection, multiple: isMultiselectionEnabled)
         } label: {
             dayView(date, calendar, calendar.isDate(date, equalTo: month, toGranularity: .month), position)
-                .environment(\.calendarDaySize, side)
                 .frame(width: length, height: length)
                 .componentHitArea(Rectangle())
         }
-        .buttonStyle(.plain)
-        .disabled(!isSelectionEnabled)
-        .if(side == nil) { $0.aspectRatio(1, contentMode: .fit) }
+        .aspectRatio(side == nil ? 1 : nil, contentMode: .fit)
         .accessibilityLabel(Text(date.formatted(Date.FormatStyle(locale: calendar.locale ?? .current, calendar: calendar, timeZone: calendar.timeZone).weekday(.wide).day().month(.wide).year())))
         .accessibilityAddTraits(position == nil ? .componentEmpty : .isSelected)
+    }
+
+    private func extendSelection(from start: CGPoint, to end: CGPoint, periods: [CalendarPeriod]) {
+        // Preserve both endpoints even when move events are coalesced before release.
+        if selection == nil { extendSelection(at: start, periods: periods) }
+        extendSelection(at: end, periods: periods)
     }
 
     private func extendSelection(at point: CGPoint, periods: [CalendarPeriod]) {

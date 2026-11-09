@@ -6,7 +6,8 @@ import Testing
 
 extension HostedRenderingTests {
     private var root: URL {
-        URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .appendingPathComponent("../..").standardizedFileURL
     }
 
     @Test("Catalogue IDs are unique and the documentation inventory stays current")
@@ -29,6 +30,7 @@ extension HostedRenderingTests {
     @Test("Every public shape has a dedicated executable example")
     func publicShapeCoverage() throws {
         let source = root.appendingPathComponent("Sources/SwiftUIComponents")
+        try #require(FileManager.default.fileExists(atPath: source.path))
         let files = try #require(FileManager.default.enumerator(at: source, includingPropertiesForKeys: nil))
         let expression = try NSRegularExpression(pattern: "public struct (\\w+): (?:MuscleMapShape|Shape)")
         for case let url as URL in files where url.pathExtension == "swift" {

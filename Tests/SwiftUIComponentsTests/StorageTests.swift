@@ -8,8 +8,8 @@ struct StorageTests {
     @Test("JSON round trips, nil removes the key, corrupt data returns nil")
     func roundTrip() throws {
         let name = "SwiftUIComponentsTests.\(UUID())"
-        let store = try #require(UserDefaults(suiteName: name))
-        defer { store.removePersistentDomain(forName: name) }
+        let store = try #require(CodableStorage(suiteName: name))
+        defer { store.removeObject(forKey: "value") }
         let value = ["count": 4]
         store.setCodable(value, forKey: "value")
         #expect(store.codable(forKey: "value") as [String: Int]? == value)
@@ -22,8 +22,8 @@ struct StorageTests {
     @Test("An encoding failure preserves the existing stored value")
     func failedEncode() throws {
         let name = "SwiftUIComponentsTests.\(UUID())"
-        let store = try #require(UserDefaults(suiteName: name))
-        defer { store.removePersistentDomain(forName: name) }
+        let store = try #require(CodableStorage(suiteName: name))
+        defer { store.removeObject(forKey: "value") }
         store.setCodable(7, forKey: "value")
         store.setCodable(Double.nan, forKey: "value")
         #expect(store.codable(forKey: "value") as Int? == 7)
@@ -32,8 +32,8 @@ struct StorageTests {
     @MainActor @Test("Wrappers share data and expose a writable binding")
     func wrappers() throws {
         let name = "SwiftUIComponentsTests.\(UUID())"
-        let store = try #require(UserDefaults(suiteName: name))
-        defer { store.removePersistentDomain(forName: name) }
+        let store = try #require(CodableStorage(suiteName: name))
+        defer { store.removeObject(forKey: "value") }
         let first = CodableAppStorage(wrappedValue: [1, 2], "value", store: store)
         let second = CodableAppStorage(wrappedValue: [0], "value", store: store)
         #expect(first.wrappedValue == [1, 2])
@@ -46,8 +46,8 @@ struct StorageTests {
     @MainActor @Test("Missing or invalid stored data uses the supplied default")
     func defaults() throws {
         let name = "SwiftUIComponentsTests.\(UUID())"
-        let store = try #require(UserDefaults(suiteName: name))
-        defer { store.removePersistentDomain(forName: name) }
+        let store = try #require(CodableStorage(suiteName: name))
+        defer { store.removeObject(forKey: "value") }
         store.set(Data("bad".utf8), forKey: "value")
         let wrapper = CodableAppStorage(wrappedValue: 8, "value", store: store)
         #expect(wrapper.wrappedValue == 8)

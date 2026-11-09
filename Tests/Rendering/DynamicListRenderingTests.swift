@@ -14,6 +14,7 @@ extension HostedRenderingTests {
           arguments: [Orientation.horizontal, .vertical], ListRenderingSizing.allCases)
     func boundedConstruction(orientation: Orientation, sizing: ListRenderingSizing) async throws {
         let model = ListRenderingProbe()
+        model.count = 30
         let content = ListRenderingHarness(model: model, orientation: orientation, sizing: sizing)
             .frame(width: 300, height: 200)
             .ignoresSafeArea()
@@ -40,6 +41,8 @@ extension HostedRenderingTests {
         // construct every cell while only reporting a handful as visible.
         for (step, index) in [0, 9_999, 5_000, 5_010, 0, 9_999, 9_999, 3, 8_000, 120, 6_500].enumerated() {
             if step > 0 {
+                // Match the catalogue's small-list -> 10,000-cell interaction.
+                if step == 1 { model.count = 10_000 }
                 model.builds = [:]
                 if step.isMultiple(of: 2) {
                     withAnimation(.linear(duration: 0.15)) { model.index = index }
@@ -70,6 +73,11 @@ extension HostedRenderingTests {
             #expect(model.index == nil)
             let reportedIndex = try #require(model.reportedIndex)
             #expect((0..<model.count).contains(reportedIndex))
+            let firstVisible = try #require(model.visible.min())
+            // The native probe uses a 10% threshold, so the immediate preceding
+            // cell may still have a thin visible edge. Older ranges must not linger.
+            #expect(reportedIndex == firstVisible || reportedIndex == firstVisible - 1,
+                    "Step \(step): callback \(reportedIndex) does not match the viewport \(model.visible)")
         }
         #expect(!model.reportedChanges.contains(nil), "A jump must not temporarily report an empty list")
         #expect(zip(model.reportedChanges, model.reportedChanges.dropFirst()).allSatisfy { $0 != $1 },

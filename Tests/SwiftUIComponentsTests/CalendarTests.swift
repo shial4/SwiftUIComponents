@@ -1,12 +1,9 @@
 import Foundation
 import Testing
 import SwiftUI
-#if os(macOS)
-import AppKit
-#endif
 @testable import SwiftUIComponents
 
-private func gregorian(_ zone: String = "UTC", firstWeekday: Int = 2) -> Calendar {
+func gregorian(_ zone: String = "UTC", firstWeekday: Int = 2) -> Calendar {
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = TimeZone(identifier: zone) ?? .gmt
     calendar.locale = Locale(identifier: "en_US_POSIX")
@@ -14,94 +11,59 @@ private func gregorian(_ zone: String = "UTC", firstWeekday: Int = 2) -> Calenda
     return calendar
 }
 
-private func date(_ year: Int, _ month: Int, _ day: Int, hour: Int = 0, calendar: Calendar) throws -> Date {
+func date(_ year: Int, _ month: Int, _ day: Int, hour: Int = 0, calendar: Calendar) throws -> Date {
     try #require(calendar.date(from: DateComponents(year: year, month: month, day: day, hour: hour)))
-}
-
-extension HostedRenderingTests {
-    #if os(macOS)
-    @MainActor @Test("Scrolling a year does not reconstruct unchanged day views")
-    func scrollingDoesNotRebuildDays() async throws {
-        _ = NSApplication.shared
-        let calendar = gregorian()
-        let preview = try date(2026, 1, 1, calendar: calendar)
-        var dayBuilds = 0
-        let content = ScrollView {
-            CalendarContentView(type: .yearly(3), selection: .constant(nil as TimeRange?),
-                                previewDate: preview, calendar: calendar) { date, calendar, _, _ in
-                dayBuilds += 1
-                return Text(String(calendar.component(.day, from: date)))
-            }.frame(width: 600)
-        }.frame(width: 600, height: 400)
-        let window = NSWindow(contentRect: CGRect(x: -2000, y: -2000, width: 600, height: 400),
-                              styleMask: [.borderless], backing: .buffered, defer: false)
-        window.isReleasedWhenClosed = false
-        window.contentView = NSHostingView(rootView: content)
-        window.orderFront(nil)
-        defer { window.close() }
-        // Let initial sizing and geometry callbacks settle before measuring scroll updates.
-        try await Task.sleep(for: .milliseconds(500))
-        func descendant(in view: NSView) -> NSScrollView? {
-            if let scroll = view as? NSScrollView { return scroll }
-            return view.subviews.lazy.compactMap { descendant(in: $0) }.first
-        }
-        let scroll = try #require(window.contentView.flatMap { descendant(in: $0) })
-        let initial = dayBuilds
-        #expect(initial > 0)
-        for step in 1...10 {
-            scroll.contentView.scroll(to: CGPoint(x: 0, y: step * 20))
-            scroll.reflectScrolledClipView(scroll.contentView)
-            try await Task.sleep(for: .milliseconds(20))
-        }
-        try await Task.sleep(for: .milliseconds(100))
-        #expect(scroll.contentView.bounds.minY == 200)
-        #expect(dayBuilds == initial)
-    }
-    #endif
-
-    @MainActor @Test("Day cells reserve square space and keep their event dot above the next row", arguments: [60, 100, 140])
-    func dayCellLayout(side: Int) throws {
-        let calendar = gregorian()
-        let date = try date(2024, 2, 10, calendar: calendar)
-        func day(size: Double?) -> DefaultDayView {
-            DefaultDayView(date: date, calendar: calendar, isDateInMonth: true, isSelected: .single,
-                           colorSet: RenderingCalendarColors(), contentColor: .blue, size: size)
-        }
-        let automatic = ImageRenderer(content: day(size: nil).frame(width: CGFloat(side)))
-        automatic.scale = 1
-        #expect(automatic.cgImage?.height == side)
-        let view = VStack(spacing: 24) {
-            day(size: Double(side))
-            day(size: 60)
-        }.background(.white)
-        let renderer = ImageRenderer(content: view)
-        renderer.scale = 1
-        let image = try #require(renderer.cgImage)
-        #expect(image.width == side)
-        #expect(image.height == side + 24 + 60)
-        var pixels = [UInt8](repeating: 0, count: image.width * image.height * 4)
-        try pixels.withUnsafeMutableBytes { buffer in
-            let context = try #require(CGContext(data: buffer.baseAddress, width: image.width, height: image.height,
-                                                 bitsPerComponent: 8, bytesPerRow: image.width * 4,
-                                                 space: CGColorSpaceCreateDeviceRGB(),
-                                                 bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
-            context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
-        }
-        // The whole gap must stay white; selection and event drawing cannot bleed into it.
-        for y in side..<(side + 24) {
-            for x in 0..<image.width {
-                let offset = (y * image.width + x) * 4
-                #expect(pixels[offset] > 240 && pixels[offset + 1] > 240 && pixels[offset + 2] > 240)
-            }
-        }
-        let dot = ((side - 5) * image.width + image.width / 2) * 4
-        #expect(pixels[dot + 2] > 200 && pixels[dot] < 100, "The event dot stays inside the first cell")
-    }
-
 }
 
 @Suite("Calendar arithmetic and selection")
 struct CalendarTests {
+    @MainActor @Test("Replacing a calendar grid releases the previous snapshot; destroying the cache releases the last one")
+    func gridLifetime() throws {
+        var cache: CalendarGridCache? = CalendarGridCache()
+        let calendar = gregorian()
+        let preview = try date(2024, 1, 1, calendar: calendar)
+        weak var previous: CalendarGridCache.Snapshot?
+        for month in 0..<120 {
+            let next = try #require(calendar.date(byAdding: .month, value: month, to: preview))
+            let snapshot = try #require(cache?.snapshot(calendar: calendar, date: next, type: .yearly(3)))
+            #expect(previous == nil, "Navigating dates must not retain historical grids")
+            previous = snapshot
+        }
+        #expect(previous != nil)
+        cache = nil
+        #expect(previous == nil, "The current grid must not outlive its view-owned cache")
+    }
+
+    @MainActor @Test("Calendar grids are reused until their date, mode or calendar changes")
+    func gridReuse() throws {
+        let cache = CalendarGridCache()
+        let calendar = gregorian()
+        let preview = try date(2024, 2, 29, calendar: calendar)
+        let first = cache.snapshot(calendar: calendar, date: preview, type: .yearly(3))
+        for _ in 0..<100 {
+            #expect(cache.snapshot(calendar: calendar, date: preview, type: .yearly(3)) === first)
+        }
+        var sundayFirst = calendar
+        sundayFirst.firstWeekday = 1
+        for (updatedCalendar, updatedDate, type) in [
+            (calendar, preview, CalendarType.monthly),
+            (calendar, preview, .weekly),
+            (calendar, try date(2025, 2, 28, calendar: calendar), .yearly(3)),
+            (sundayFirst, preview, .yearly(3)),
+            (gregorian("America/New_York"), preview, .yearly(3)),
+            (Calendar(identifier: .hebrew), preview, .yearly(3))
+        ] {
+            let snapshot = cache.snapshot(calendar: updatedCalendar, date: updatedDate, type: type)
+            let expected = CalendarGrid(calendar: updatedCalendar).periods(containing: updatedDate, type: type)
+            #expect(snapshot !== first)
+            #expect(snapshot.periods.map(\.dates) == expected.map(\.dates))
+            #expect(snapshot.periods.map(\.month) == expected.map(\.month))
+        }
+        let restored = cache.snapshot(calendar: calendar, date: preview, type: .yearly(3))
+        #expect(restored !== first, "Only the current grid is retained")
+        #expect(restored.periods.map(\.dates) == first.periods.map(\.dates))
+    }
+
     @Test("Month grids contain every day, aligned to the first weekday", arguments: [1, 2, 3, 7])
     func monthGrid(firstWeekday: Int) throws {
         let calendar = gregorian(firstWeekday: firstWeekday)
@@ -225,9 +187,6 @@ struct CalendarTests {
         #expect(january.timeString(calendar) == "14:00")
     }
 
-}
-
-extension HostedRenderingTests {
     @MainActor @Test("Native ClosedRange bindings remain readable and writable")
     func nativeRangeCompatibility() throws {
         let calendar = gregorian()
@@ -240,74 +199,10 @@ extension HostedRenderingTests {
         #expect(owner.selection == first...last)
         #expect(mapped.wrappedValue == TimeRange(start: first, end: last))
         #expect(owner.selection?.toArray(calendar: calendar).count == 3)
-        let view = CalendarView(date: .constant(first), selection: binding, calendar: calendar)
-        #expect(ImageRenderer(content: view.frame(width: 350, height: 350)).cgImage != nil)
         mapped.wrappedValue = nil
         #expect(owner.selection == nil)
     }
 
-    @MainActor @Test("Year rendering retains all months for unusual column counts", arguments: [-1, 0, 5, 20])
-    func yearColumns(columns: Int) throws {
-        let calendar = gregorian()
-        var months: Set<Int> = []
-        let view = CalendarContentView(type: .yearly(columns), selection: .constant(nil as TimeRange?),
-                                       previewDate: try date(2024, 1, 1, calendar: calendar), calendar: calendar) { date, calendar, inMonth, _ in
-            if inMonth { months.insert(calendar.component(.month, from: date)) }
-            return Text("Day")
-        }
-        #expect(ImageRenderer(content: view.frame(width: 600, height: 4000)).cgImage != nil)
-        #expect(months == Set(1...12))
-    }
-
-    @MainActor @Test("Custom builders preserve selected dates, week mode and disabled selection")
-    func customBuildersRetainSettings() throws {
-        let calendar = gregorian()
-        var renderedDays: [Date] = []
-        var selectedDays: Set<Date> = []
-        var enabledValues: [Bool] = []
-        let owner = RangeOwner()
-        let start = try date(2024, 2, 6, hour: 12, calendar: calendar)
-        let end = try date(2024, 2, 8, hour: 16, calendar: calendar)
-        owner.selection = start...end
-        let view = CalendarView(date: .constant(try date(2024, 2, 10, calendar: calendar)),
-                                selection: Binding(for: \RangeOwner.selection, on: owner),
-                                calendar: calendar, type: .weekly)
-            .selectionEnabled(false).multiselectionEnabled(false)
-            .headerView { _, _ in Text("Custom header") }
-            .weekdaysView { _ in Text("Custom weekdays") }
-            .dayView { date, _, _, position in
-                if position != nil { selectedDays.insert(date) }
-                return DayProbe(date: date) { day, enabled in renderedDays.append(day); enabledValues.append(enabled) }
-            }
-        let image = ImageRenderer(content: view.frame(width: 350, height: 150)).cgImage
-        #expect(image != nil)
-        #expect(Set(renderedDays).count == 7)
-        #expect(selectedDays == Set(try [6, 7, 8].map { try date(2024, 2, $0, calendar: calendar) }))
-        #expect(owner.selection == start...end, "Styling must not rewrite the caller's dates or times")
-        #expect(!enabledValues.isEmpty && enabledValues.allSatisfy { !$0 })
-    }
 }
 
-private struct DayProbe: View {
-    @Environment(\.isEnabled) private var enabled
-    let date: Date
-    let record: (Date, Bool) -> Void
-    var body: some View {
-        record(date, enabled)
-        return Text("Day")
-    }
-}
-
-@MainActor private final class RangeOwner { var selection: ClosedRange<Date>? }
-
-private struct RenderingCalendarColors: CalendarColorSet {
-    var todayColor: Color { .black }
-    var sundayColor: Color { .black }
-    var saturdayColor: Color { .black }
-    var weekdayColor: Color { .black }
-    var selectionColor: Color { .red }
-    var otherDateColor: Color { .black }
-    var weekdayHeaderColor: Color { .black }
-    var headerTitleColor: Color { .black }
-    var headerButtonColors: Color { .black }
-}
+@MainActor final class RangeOwner { var selection: ClosedRange<Date>? }

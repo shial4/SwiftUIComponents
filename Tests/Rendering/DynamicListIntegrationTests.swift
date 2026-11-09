@@ -150,7 +150,7 @@ extension HostedRenderingTests {
             let extent = orientation == .horizontal ? document.frame.width : document.frame.height
             let viewport = orientation == .horizontal ? scrollView.contentView.bounds.width : scrollView.contentView.bounds.height
             return model.appeared.contains(model.count - 1)
-                && model.visibleIndex == model.count - 1
+                && model.visibleIndex.map { model.appeared.contains($0) } == true
                 && abs(model.offset + extent - viewport) < 2
                 && abs(axisOffset(scrollView, orientation) + model.offset) < 2
         }
@@ -224,8 +224,18 @@ extension HostedRenderingTests {
     @Test("Visible-cell callbacks include the partially visible leading cell",
           arguments: [Orientation.horizontal, .vertical], [false, true])
     func partialLeadingCell(orientation: Orientation, automatic: Bool) async throws {
+        try await checkPartialLeadingCell(orientation: orientation, automatic: automatic, indexed: true)
+    }
+
+    @Test("Point-offset callbacks also report the partially visible leading cell",
+          arguments: [Orientation.horizontal, .vertical], [false, true])
+    func pointPartialLeadingCell(orientation: Orientation, automatic: Bool) async throws {
+        try await checkPartialLeadingCell(orientation: orientation, automatic: automatic, indexed: false)
+    }
+
+    private func checkPartialLeadingCell(orientation: Orientation, automatic: Bool, indexed: Bool) async throws {
         let model = ListState(orientation: orientation)
-        model.indexed = true
+        model.indexed = indexed
         model.automatic = automatic
         let window = mount(model)
         defer { window.close() }
@@ -336,9 +346,11 @@ private struct ListHarness: View {
                 }
             } else if let lengths = model.lengths {
                 DynamicList(scrollOffset: $model.offset, orientation: model.orientation, itemLengths: lengths) { cell($0) }
+                    .onVisibleCellChange(model.recordVisibleCell)
             } else {
                 DynamicList(scrollOffset: $model.offset, orientation: model.orientation,
                             numberOfItems: model.count, itemLength: 40) { cell($0) }
+                    .onVisibleCellChange(model.recordVisibleCell)
             }
         }
         .frame(width: model.width, height: 200)

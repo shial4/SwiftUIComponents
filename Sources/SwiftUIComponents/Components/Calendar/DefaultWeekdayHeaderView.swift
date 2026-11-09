@@ -17,16 +17,18 @@ public struct DefaultWeekdaysHeaderView: View {
 
     public var body: some View {
         let symbols = calendar.shortWeekdaySymbols
-        return HStack {
+        return HStack(spacing: 0) {
             ForEach(symbols.indices, id: \.self) { index in
                 Text(symbols[(calendar.firstWeekday - 1 + index) % symbols.count])
                 #if !os(Android)
                     .fontWidth(.compressed)
                 #endif
-                    .frame(maxWidth: Double.infinity)
                     .foregroundStyle(headerTextColor)
                     .font(Font.system(Font.TextStyle.callout).weight(Font.Weight.light))
                     .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                    .padding(.horizontal, 1)
+                    .frame(maxWidth: Double.infinity)
             }
         }
     }

@@ -57,6 +57,35 @@ struct CalendarPeriod: Identifiable {
     var id: Date { dates.first ?? month }
 }
 
+// Selection and sizing change much more often than the displayed dates. Retain
+// only the current grid, without publishing another UI update when it is rebuilt.
+@MainActor final class CalendarGridCache {
+    final class Snapshot {
+        let calendar: Calendar
+        let date: Date
+        let type: CalendarType
+        let periods: [CalendarPeriod]
+
+        init(calendar: Calendar, date: Date, type: CalendarType) {
+            self.calendar = calendar
+            self.date = date
+            self.type = type
+            self.periods = CalendarGrid(calendar: calendar).periods(containing: date, type: type)
+        }
+    }
+
+    private var current: Snapshot?
+
+    func snapshot(calendar: Calendar, date: Date, type: CalendarType) -> Snapshot {
+        if let current, current.calendar == calendar, current.date == date, current.type == type {
+            return current
+        }
+        let snapshot = Snapshot(calendar: calendar, date: date, type: type)
+        current = snapshot
+        return snapshot
+    }
+}
+
 struct CalendarSelection {
     let calendar: Calendar
 

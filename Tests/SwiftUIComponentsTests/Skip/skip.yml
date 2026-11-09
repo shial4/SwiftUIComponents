@@ -1,1 +1,3 @@
-
+# Shared logic tests use the same native Swift implementation on Android.
+skip:
+  mode: 'native'

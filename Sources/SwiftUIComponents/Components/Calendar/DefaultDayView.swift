@@ -42,6 +42,8 @@ public struct DefaultDayView: View {
         let length: CGFloat? = side.map { CGFloat($0) }
         Text(date.formatted(Date.FormatStyle(locale: calendar.locale ?? .current,
                                               calendar: calendar, timeZone: calendar.timeZone).day()))
+            .lineLimit(1)
+            .minimumScaleFactor(0.5)
             .fontWeight(calendar.isDateInWeekend(date) || calendar.isDateInToday(date) ? .semibold : .regular)
             .foregroundStyle(textColor)
             .frame(width: length, height: length)

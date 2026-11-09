@@ -14,17 +14,21 @@ let package = Package(
     products: [
         .library(
             name: "SwiftUIComponents",
+            type: needsSkipMetadata ? .dynamic : nil,
             targets: ["SwiftUIComponents"]),
         .executable(name: "ComponentCatalogDemo", targets: ["ComponentCatalogRunner"]),
         .library(name: "ComponentCatalog", type: .dynamic, targets: ["ComponentCatalog"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/skiptools/skip.git", from: "1.9.2"),
-        .package(url: "https://github.com/skiptools/skip-fuse-ui.git", from: "1.9.1"),
+        .package(url: "https://github.com/skiptools/skip.git", from: "1.9.20"),
+        .package(url: "https://github.com/skiptools/skip-fuse-ui.git", from: "1.19.4"),
+        // Keep drag endpoints and path hit testing correct in consuming apps too.
+        .package(url: "https://github.com/skiptools/skip-ui.git", from: "1.66.3"),
     ],
     targets: [
         .target(name: "SwiftUIComponents", dependencies: [
             .product(name: "SkipFuseUI", package: "skip-fuse-ui", condition: skipUICondition),
+            .product(name: "SkipUI", package: "skip-ui", condition: skipUICondition),
         ], plugins: [.plugin(name: "skipstone", package: "skip")]),
         .target(
             name: "ComponentCatalog",
@@ -40,7 +44,8 @@ let package = Package(
                 "SwiftUIComponents",
                 .target(name: "ComponentCatalog", condition: .when(platforms: [.macOS])),
             ],
-            exclude: ["Skip"]
+            path: "Tests",
+            exclude: ["Package.swift", "Package.resolved", "SwiftUIComponentsTests/Skip"]
         ),
     ],
     swiftLanguageModes: [.v6]

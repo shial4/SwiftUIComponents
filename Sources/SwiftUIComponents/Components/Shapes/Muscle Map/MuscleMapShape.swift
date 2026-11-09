@@ -97,12 +97,23 @@ nonisolated public struct MuscleMapVectorPath: Sendable {
 
 nonisolated struct MuscleMapHitRegion {
     private static let edgeTolerance = 0.75
-    let polygons: [[CGPoint]]
+    private let sourcePolygons: [[CGPoint]]
     private let bounds: [CGRect]
+    private let scale: CGSize
+    private let offset: CGPoint
 
-    init(polygons: [[CGPoint]], bounds: [CGRect]? = nil) {
-        self.polygons = polygons
+    init(polygons: [[CGPoint]], bounds: [CGRect]? = nil,
+         scale: CGSize = CGSize(width: 1, height: 1), offset: CGPoint = .zero) {
+        self.sourcePolygons = polygons
         self.bounds = bounds ?? polygons.map(Self.bounds)
+        self.scale = scale
+        self.offset = offset
+    }
+
+    var polygons: [[CGPoint]] { sourcePolygons.map { $0.map(transformed) } }
+
+    private func transformed(_ point: CGPoint) -> CGPoint {
+        CGPoint(x: point.x * scale.width + offset.x, y: point.y * scale.height + offset.y)
     }
 
     static func bounds(of polygon: [CGPoint]) -> CGRect {
@@ -118,7 +129,7 @@ nonisolated struct MuscleMapHitRegion {
     }
 
     func contains(_ point: CGPoint) -> Bool {
-        zip(polygons, bounds).contains { polygon, bounds in
+        zip(sourcePolygons, bounds).contains { polygon, bounds in
             point.x >= bounds.minX - Self.edgeTolerance && point.x <= bounds.maxX + Self.edgeTolerance
                 && point.y >= bounds.minY - Self.edgeTolerance && point.y <= bounds.maxY + Self.edgeTolerance
                 && polygonContains(point, polygon: polygon)
@@ -127,7 +138,7 @@ nonisolated struct MuscleMapHitRegion {
 
     /// Only polygons that can fall within `maximum` need an edge walk.
     func distance(to point: CGPoint, maximum: Double = .greatestFiniteMagnitude) -> Double {
-        zip(polygons, bounds).reduce(Double.greatestFiniteMagnitude) { closest, item in
+        zip(sourcePolygons, bounds).reduce(Double.greatestFiniteMagnitude) { closest, item in
             let (polygon, bounds) = item
             let dx = max(bounds.minX - point.x, point.x - bounds.maxX, 0)
             let dy = max(bounds.minY - point.y, point.y - bounds.maxY, 0)
@@ -140,8 +151,9 @@ nonisolated struct MuscleMapHitRegion {
         guard polygon.count >= 3 else { return false }
 
         var inside = false
-        var previous = polygon[polygon.count - 1]
-        for current in polygon {
+        var previous = transformed(polygon[polygon.count - 1])
+        for pointOnPolygon in polygon {
+            let current = transformed(pointOnPolygon)
             if segmentDistanceSquared(point, from: previous, to: current) <= Self.edgeTolerance * Self.edgeTolerance {
                 return true
             }
@@ -163,8 +175,9 @@ nonisolated struct MuscleMapHitRegion {
         guard !polygon.isEmpty else { return Double.greatestFiniteMagnitude }
 
         var closest = Double.greatestFiniteMagnitude
-        var previous = polygon[polygon.count - 1]
-        for current in polygon {
+        var previous = transformed(polygon[polygon.count - 1])
+        for pointOnPolygon in polygon {
+            let current = transformed(pointOnPolygon)
             closest = min(closest, segmentDistanceSquared(point, from: previous, to: current))
             previous = current
         }
@@ -190,9 +203,8 @@ nonisolated struct MuscleMapHitRegion {
     }
 }
 
-/// Built-in vectors are immutable. Flatten their curves once, then scale the
-/// points for drawing and hit testing. Custom MuscleMapShape implementations
-/// keep their existing size-dependent paths contract.
+/// Cache built-in vectors and their flattened hit polygons. Custom
+/// MuscleMapShape implementations keep their size-dependent paths contract.
 nonisolated struct MuscleMapGeometry: Sendable {
     let vectors: [MuscleMapVectorPath]
     let polygons: [[CGPoint]]
@@ -244,17 +256,16 @@ extension MuscleMapShape {
         if let cached = self as? any CachedMuscleMapShape {
             let geometry = type(of: cached).geometry
             let width = rect.width / 10, height = rect.height / 10
-            let polygons = geometry.polygons.map { polygon in
-                polygon.map { point in
-                    CGPoint(x: rect.minX + point.x * width + translation, y: rect.maxY - point.y * height)
-                }
-            }
             let bounds = geometry.bounds.map { bounds in
                 CGRect(x: rect.minX + bounds.minX * width + translation,
                        y: rect.maxY - bounds.maxY * height,
                        width: bounds.width * width, height: bounds.height * height)
             }
-            return MuscleMapHitRegion(polygons: polygons, bounds: bounds)
+            // Share the immutable points. Most targets are rejected by their bounds,
+            // so transform edges only when the touch actually needs a polygon walk.
+            return MuscleMapHitRegion(polygons: geometry.polygons, bounds: bounds,
+                                      scale: CGSize(width: width, height: -height),
+                                      offset: CGPoint(x: rect.minX + translation, y: rect.maxY))
         }
         let vectors = paths(
             width: rect.size.width / 10.0,
