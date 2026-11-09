@@ -73,9 +73,11 @@ Each cycle changes calendar styles while preserving selection, jumps through a 1
 
 SkipUI 1.66.3 also includes the [saved-state weak-key fix](https://github.com/skiptools/skip-ui/commit/0ed282718976bedfe362fb1246d1411c0ee25026), which allows discarded navigation state to be released. Keep checking settled memory across repeated navigation when updating dependencies.
 
-The script fails on Android crash or not-responding dialogs. Run performance and memory checks without competing builds, and inspect the recorded heap trend separately from the interaction results.
+The script requires a newly written accessibility snapshot for every observation and retries transient dump failures. It never reuses the previous screen after a failed dump. The script fails on Android crash or not-responding dialogs. Run performance and memory checks without competing builds, and inspect the recorded heap trend separately from the interaction results.
 
 The calendar release regression sends the final finger position only in the touch-up event and checks that the selected range includes that day. SkipUI 1.66.3 contains the upstream fix; keep this check enabled to catch regressions.
+
+The cross-month year-grid drag after scrolling is still a failing Android UI check with the pinned dependencies: selection can stop before the intended end date. The strict 38-day assertion remains enabled. This issue is not resolved by the released touch-up fix, and 1.0.7 remains untagged pending release review.
 
 ## Platform behavior
 

@@ -22,8 +22,19 @@ class Catalogue:
         return subprocess.check_output(self.adb + list(args), stderr=subprocess.DEVNULL)
 
     def nodes(self, fail_on_error=True):
-        self.run("shell", "uiautomator", "dump", "/sdcard/components.xml")
-        root = ET.fromstring(self.run("shell", "cat", "/sdcard/components.xml"))
+        # UIAutomator can exit successfully without writing a dump during an
+        # activity transition. Never mistake the previous screen for fresh state.
+        for attempt in range(3):
+            self.run("shell", "rm", "-f", "/sdcard/components.xml")
+            self.run("shell", "uiautomator", "dump", "/sdcard/components.xml")
+            try:
+                snapshot = self.run("shell", "cat", "/sdcard/components.xml")
+                break
+            except subprocess.CalledProcessError as error:
+                if attempt == 2:
+                    raise AssertionError("Android did not provide a fresh UI hierarchy") from error
+                time.sleep(0.2)
+        root = ET.fromstring(snapshot)
         if any(n.get("resource-id") == "android:id/aerr_close" for n in root.iter("node")):
             if fail_on_error:
                 raise AssertionError("Android reported an application crash or not-responding dialog")
