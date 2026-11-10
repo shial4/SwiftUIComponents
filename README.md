@@ -45,12 +45,12 @@ Swift 6.3 or later.
 
 ## Install
 
-In Xcode, choose **File > Add Package Dependencies**, enter `https://github.com/shial4/SwiftUIComponents.git`, choose **Up to Next Major Version** starting at **1.0.7**, and add the **SwiftUIComponents** library to your target.
+In Xcode, choose **File > Add Package Dependencies**, enter `https://github.com/shial4/SwiftUIComponents.git`, choose **Up to Next Major Version** starting at **1.0.8**, and add the **SwiftUIComponents** library to your target.
 
 Or add the package to `Package.swift`:
 
 ```swift
-.package(url: "https://github.com/shial4/SwiftUIComponents.git", from: "1.0.7")
+.package(url: "https://github.com/shial4/SwiftUIComponents.git", from: "1.0.8")
 ```
 
 Then add its product to your target's dependencies:
@@ -365,7 +365,7 @@ Custom builders retain the period, calendar and selection options. Use `.headerV
 
 A tap starts a selection; a second distinct tap extends a single-day selection into a range. Tapping a selected day or an existing multi-day range clears it. With multiselection disabled, tapping another day replaces the selection. Drag across days to grow a range; use the gaps or month headings to scroll a year view without changing the selection. With range selection disabled, dragging over days also scrolls the containing view. `TimeRange.toArray(calendar:)` returns inclusive calendar days; reversed ranges are empty.
 
-**Known Android limitation:** cross-month dragging in the year view after scrolling can stop before the intended end date. Version 1.0.7 does not resolve this interaction. See the [Android validation notes](Android/README.md#runtime-smoke-checks).
+**Android:** Version 1.0.8 fixes slow cross-month dragging after scrolling. See the [Android validation notes](Android/README.md#runtime-smoke-checks).
 
 #### Standalone calendar building blocks
 

@@ -28,22 +28,6 @@ extension View {
         #endif
     }
 
-    @available(tvOS, unavailable)
-    func componentRangeGesture(minimumDistance: CGFloat, isEnabled: Bool,
-                               action: @escaping (DragGesture.Value) -> Void) -> some View {
-        #if os(Android)
-        // Skip starts nonzero-distance drags after touch slop, losing the original start point.
-        let update: (DragGesture.Value) -> Void = { value in
-            if hypot(value.translation.width, value.translation.height) >= minimumDistance { action(value) }
-        }
-        return simultaneousGesture(DragGesture(minimumDistance: 0, coordinateSpace: .global)
-            .onChanged(update).onEnded(update), isEnabled: isEnabled)
-        #else
-        return highPriorityGesture(DragGesture(minimumDistance: minimumDistance, coordinateSpace: .global)
-            .onChanged(action).onEnded(action), isEnabled: isEnabled)
-        #endif
-    }
-
     /// Skip uses the background's layout bounds for gesture hit testing.
     func componentHitArea<S: Shape>(_ shape: S) -> some View {
         #if os(Android)

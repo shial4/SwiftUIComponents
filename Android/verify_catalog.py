@@ -499,23 +499,29 @@ def verify_calendar(catalogue):
 
     catalogue.open("CalendarContentView")
     catalogue.tap("Year")
-    first = last = None
+    first = last = positions = None
     def adjacent_months_ready(nodes):
-        nonlocal first, last
+        nonlocal first, last, positions
         cells = days(nodes)
         first = next((n for n in cells if re.search(r", 5 January \d{4}$", n.get("content-desc", ""))), None)
         last = next((n for n in cells if re.search(r", 11 February \d{4}$", n.get("content-desc", ""))), None)
-        return first is not None and last is not None
-    check("year calendar exposes dates across adjacent months", catalogue.wait_for(adjacent_months_ready, timeout=15))
+        current = (catalogue.bounds(first), catalogue.bounds(last)) if first is not None and last is not None else None
+        settled = current is not None and current == positions
+        positions = current
+        return settled
+    check("year calendar settles dates across adjacent months", catalogue.wait_for(adjacent_months_ready, timeout=30))
     # Scroll between month columns so the page moves without starting a range.
     # Drag selection must use the new row positions even when days do not redraw.
     original_top = catalogue.bounds(first)[1]
     scroll = next(n for n in catalogue.nodes() if n.get("scrollable") == "true")
     left, top, right, bottom = catalogue.bounds(scroll)
     middle = (left + right) // 2
-    height = bottom - top
-    for _ in range(3):
-        catalogue.swipe(middle, top + height * 3 // 4, middle, top + height // 4, duration=1000)
+    y = (top + bottom) // 2
+    displacement = min(round(48 * density), max(1, (original_top - top) // 4))
+    # A short stroke may only collapse and restore the navigation title. Allow
+    # a longer stroke while keeping both target dates within the viewport.
+    for distance in (displacement, displacement, displacement * 2):
+        catalogue.swipe(middle, y, middle, y - distance, duration=1000)
         cells = days()
         first = next((n for n in cells if re.search(r", 5 January \d{4}$", n.get("content-desc", ""))), None)
         last = next((n for n in cells if re.search(r", 11 February \d{4}$", n.get("content-desc", ""))), None)
@@ -524,9 +530,23 @@ def verify_calendar(catalogue):
     check("year calendar scroll changes day positions", first is not None and last is not None
           and catalogue.bounds(first)[1] < original_top)
     check("scrolling between months preserves the selection", catalogue.has_text("Selected days: 0"))
-    catalogue.drag(*center(first), *center(last))
-    check("calendar drag crosses month boundaries after scrolling", catalogue.wait_for(
+    positions = None
+    check("year calendar settles after gutter scrolling", catalogue.wait_for(adjacent_months_ready, timeout=30))
+    # A slow, continuous Android touch stream exposes parent scrolling during
+    # range selection. A fast swipe can finish before the grid has moved a row.
+    catalogue.swipe(*center(first), *center(last), duration=5000)
+    check("slow calendar drag crosses month boundaries after scrolling", catalogue.wait_for(
         lambda nodes: any(n.get("text") == "Selected days: 38" for n in nodes), timeout=15))
+    catalogue.tap_node(first)
+    check("day taps still clear a dragged range", catalogue.has_text("Selected days: 0"))
+    cells = days()
+    first = next(n for n in cells if re.search(r", 5 January \d{4}$", n.get("content-desc", "")))
+    last = next(n for n in cells if re.search(r", 19 January \d{4}$", n.get("content-desc", "")))
+    catalogue.swipe(*center(first), *center(last), duration=3000)
+    check("vertical day dragging selects instead of scrolling", catalogue.has_text("Selected days: 15"))
+    catalogue.tap_node(first)
+    catalogue.tap_node(first)
+    check("day taps can start a new selection after dragging", catalogue.has_text("Selected days: 1"))
 
 
 def verify_calendar_state(catalogue):
@@ -805,6 +825,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--serial", help="adb emulator/device serial")
     parser.add_argument("--screenshots", type=Path, help="optional screenshot output directory")
+    parser.add_argument("--calendar-only", action="store_true", help="run calendar layout, selection and gesture checks only")
     parser.add_argument("--memory-report", type=Path, help="record process memory across repeated navigation")
     parser.add_argument("--memory-cycles", type=int, default=5, help="navigation cycles in the memory run (default: 5)")
     parser.add_argument("--memory-only", action="store_true", help="run memory navigation without repeating the smoke suite")
@@ -812,7 +833,14 @@ if __name__ == "__main__":
     if args.memory_cycles < 1 or (args.memory_only and args.memory_report is None):
         parser.error("memory cycles must be positive and --memory-only requires --memory-report")
     catalogue = Catalogue(args.serial)
-    if not args.memory_only:
+    if args.calendar_only:
+        if args.memory_only or args.memory_report or args.screenshots:
+            parser.error("--calendar-only cannot be combined with memory or screenshot options")
+        verify_calendar(catalogue)
+        verify_calendar_state(catalogue)
+        verify_calendar_release(catalogue)
+        print("Android calendar checks passed", flush=True)
+    elif not args.memory_only:
         verify(catalogue, args.screenshots)
     if args.memory_report:
         verify_memory(catalogue, args.memory_report, args.memory_cycles)

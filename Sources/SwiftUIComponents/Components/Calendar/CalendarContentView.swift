@@ -93,9 +93,11 @@ public struct CalendarContentView<Day: View>: View {
         .id(period.id)
         #if !os(tvOS)
         // Start range gestures on days, leaving month headings and gaps available for scrolling.
-        .componentRangeGesture(minimumDistance: 4, isEnabled: isSelectionEnabled && isMultiselectionEnabled) { value in
+        .modifier(CalendarRangeGesture(isEnabled: isSelectionEnabled && isMultiselectionEnabled, onTap: { point in
+            if let day = date(at: point, periods: periods) { select(day) }
+        }) { value in
             extendSelection(from: value.startLocation, to: value.location, periods: periods)
-        }
+        })
         #endif
     }
 
@@ -103,7 +105,7 @@ public struct CalendarContentView<Day: View>: View {
         let length: CGFloat? = side.map { CGFloat($0) }
         let position = CalendarSelection.position(ofDay: date, in: selectedDays)
         return Button {
-            selection = CalendarSelection(calendar: calendar).tapping(date, selection: selection, multiple: isMultiselectionEnabled)
+            select(date)
         } label: {
             dayView(date, calendar, calendar.isDate(date, equalTo: month, toGranularity: .month), position)
                 .frame(width: length, height: length)
@@ -114,6 +116,11 @@ public struct CalendarContentView<Day: View>: View {
         .accessibilityAddTraits(position == nil ? .componentEmpty : .isSelected)
     }
 
+    private func select(_ date: Date) {
+        guard isSelectionEnabled else { return }
+        selection = CalendarSelection(calendar: calendar).tapping(date, selection: selection, multiple: isMultiselectionEnabled)
+    }
+
     private func extendSelection(from start: CGPoint, to end: CGPoint, periods: [CalendarPeriod]) {
         // Preserve both endpoints even when move events are coalesced before release.
         if selection == nil { extendSelection(at: start, periods: periods) }
@@ -122,7 +129,13 @@ public struct CalendarContentView<Day: View>: View {
 
     private func extendSelection(at point: CGPoint, periods: [CalendarPeriod]) {
         guard isSelectionEnabled, isMultiselectionEnabled,
-              point.x.isFinite, point.y.isFinite else { return }
+              let day = date(at: point, periods: periods) else { return }
+        let updated = CalendarSelection(calendar: calendar).extending(to: day, selection: selection)
+        if updated != selection { selection = updated }
+    }
+
+    private func date(at point: CGPoint, periods: [CalendarPeriod]) -> Date? {
+        guard point.x.isFinite, point.y.isFinite else { return nil }
         let columns = calendar.weekdaySymbols.count
         for period in periods {
             for row in 0..<((period.dates.count + columns - 1) / columns) {
@@ -131,12 +144,10 @@ public struct CalendarContentView<Day: View>: View {
                       frame.contains(point), frame.width > 0 else { continue }
                 let column = Int((point.x - frame.minX) / (frame.width / Double(columns)))
                 let index = row * columns + column
-                guard period.dates.indices.contains(index) else { return }
-                let updated = CalendarSelection(calendar: calendar).extending(to: period.dates[index], selection: selection)
-                if updated != selection { selection = updated }
-                return
+                return period.dates.indices.contains(index) ? period.dates[index] : nil
             }
         }
+        return nil
     }
 
     public func multiselectionEnabled(_ enabled: Bool) -> Self {

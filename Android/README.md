@@ -62,6 +62,12 @@ python3 Android/verify_catalog.py --serial emulator-5554
 
 This opens all 84 routes and checks Muscle Map tapping and drag painting, calendar sizing and selection, key-path and JSON integrations, checkbox and rating bindings, badge labels, counting formats, progress updates, and joystick drag/release. List checks cover both axes, all sizing modes, shrinking/empty data, and 10,000-cell jumps followed by selection and dragging. Storage checks synchronize two readers and restart the process. The script resets the example preferences to their defaults. Add `--screenshots Documentation/Images` to capture each Android demo for the README.
 
+For calendar changes, run only its layout, selection, style and gesture checks:
+
+```sh
+python3 Android/verify_catalog.py --serial emulator-5554 --calendar-only
+```
+
 To measure repeated navigation in one app process:
 
 ```sh
@@ -77,7 +83,7 @@ The script requires a newly written accessibility snapshot for every observation
 
 The calendar release regression sends the final finger position only in the touch-up event and checks that the selected range includes that day. SkipUI 1.66.3 contains the upstream fix; keep this check enabled to catch regressions.
 
-The cross-month year-grid drag after scrolling remains a known limitation in 1.0.7: selection can stop before the intended end date. Incorrect range selection was also reproduced in the official 1.0.6 APK, but an identical underlying cause has not been established. The current build passes a fast continuous drag and fails a slower drag with valid touch timestamps. Restoring the old gesture attachment does not fix that failure. The strict 38-day assertion remains enabled; this release does not claim a fully passing Android UI suite or a fix for this interaction.
+Version 1.0.8 fixes slow cross-month selection after scrolling. The calendar's shared Swift gesture modifier now consumes day-grid drags instead of observing them simultaneously with page scrolling, which moved the dates under the finger. Taps use the existing selection rules, and month headings and gutters remain scrollable. The regression uses a five-second native swipe from January 5 to February 11 and requires all 38 days, then checks vertical dragging and taps.
 
 ## Platform behavior
 
