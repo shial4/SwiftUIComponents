@@ -45,12 +45,12 @@ Swift 6.3 or later.
 
 ## Install
 
-In Xcode, choose **File > Add Package Dependencies**, enter `https://github.com/shial4/SwiftUIComponents.git`, choose **Up to Next Major Version** starting at **1.0.8**, and add the **SwiftUIComponents** library to your target.
+In Xcode, choose **File > Add Package Dependencies**, enter `https://github.com/shial4/SwiftUIComponents.git`, choose **Up to Next Major Version** starting at **1.1.0**, and add the **SwiftUIComponents** library to your target.
 
 Or add the package to `Package.swift`:
 
 ```swift
-.package(url: "https://github.com/shial4/SwiftUIComponents.git", from: "1.0.8")
+.package(url: "https://github.com/shial4/SwiftUIComponents.git", from: "1.1.0")
 ```
 
 Then add its product to your target's dependencies:
@@ -745,7 +745,7 @@ Shapes support transforms and nonzero drawing origins. Star accepts 2...1024 poi
 
 ### Every modifier and layout helper
 
-Each helper has its own screen and a visible result. [Complete modifier playgrounds](Examples/Examples/ViewExamples/ModifiersExampleView.swift).
+Explore masks, corners, geometry, transforms and layout in the [modifier playgrounds](Examples/Examples/ViewExamples/ModifiersExampleView.swift).
 
 <details>
 <summary>Reverse Mask</summary>
@@ -871,6 +871,24 @@ StackView(orientation: vertical ? .vertical : .horizontal) {
 </details>
 
 Geometry modifiers report size or global frame changes. For platform-specific transition and axis-switching behavior, see the [compatibility notes](Android/README.md#platform-behavior).
+
+#### Debounce and throttle state changes
+
+Use `onChangeDebounced` to wait for a pause, or `onChangeThrottled` to limit updates during continuous input:
+
+```swift
+TextField("Search", text: $query)
+    .onChangeDebounced(of: query, interval: .milliseconds(300)) {
+        search(query)
+    }
+
+Slider(value: $progress)
+    .onChangeThrottled(of: progress, interval: .milliseconds(300)) {
+        updatePreview(progress)
+    }
+```
+
+Both default to 250 milliseconds, skip the initial value, run actions on the main actor, and cancel pending work when the view disappears. Debounce restarts its delay on every change. Throttle runs the first change immediately and delivers the latest pending change at the end of the interval; pass `latest: false` to discard changes during that interval. Nonpositive intervals run each observed change immediately. Changes to the interval or throttle policy apply on the next observed value change.
 
 ### Codable storage
 
